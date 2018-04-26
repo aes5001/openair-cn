@@ -41,9 +41,7 @@ pipeline {
     }
     post {
         always {
-            dir ('tmp') {
-                deleteDir()
-            }
+            sh "sudo rm -Rf ${WORKSPACE}/tmp"
         }
     }
 }
