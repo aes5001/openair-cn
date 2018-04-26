@@ -39,7 +39,19 @@ pipeline {
         }
     }
     post {
-        always {
+        success {
+            updateGithubCommitStatus(currentBuild, "Build job completed")
+        }
+        failure {
+            updateGithubCommitStatus(currentBuild, "One step of job failed")
+        }
+        unstable {
+            updateGithubCommitStatus(currentBuild, "One step of job is unstable")
+        }
+        aborted {
+            updateGithubCommitStatus(currentBuild, "Build job aborted: pipeline script issue?")
+        }
+        cleanup {
             dir ('tmp') {
                 sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
             }
@@ -47,3 +59,33 @@ pipeline {
         }
     }
 }
+
+def getRepoURL() {
+  sh "git config --get remote.origin.url > .git/remote-url"
+  return readFile(".git/remote-url").trim()
+}
+
+def getCommitSha() {
+  sh "git rev-parse HEAD > .git/current-commit"
+  return readFile(".git/current-commit").trim()
+}
+
+def updateGithubCommitStatus(build, jobMessage) {
+  // workaround https://issues.jenkins-ci.org/browse/JENKINS-38674
+  repoUrl = getRepoURL()
+  commitSha = getCommitSha()
+
+  step([
+    $class: 'GitHubCommitStatusSetter',
+    reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl],
+    commitShaSource: [$class: "ManuallyEnteredShaSource", sha: commitSha],
+    errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
+    statusResultSource: [
+      $class: 'ConditionalStatusResultSource',
+      results: [
+        [$class: 'AnyBuildResult', state: build.currentResult, message: jobMessage]
+      ]
+    ]
+  ])
+}
+
