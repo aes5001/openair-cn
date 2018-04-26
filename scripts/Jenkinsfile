@@ -27,14 +27,22 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 echo "Git URL    is ${GIT_URL}"
-                echo "DNS1 Addr  is ${dns1}"
-                echo "DNS2 Addr  is ${dns2}"
-                echo "VM Display is ${vm_display}"
-                if (getBinding.hasVariable(${params.DNS1_ADDR})) {
-                    echo "DNS1 was a build params"
-                } else {
-                    echo "DNS1 is NOT a build params"
+                sh "mkdir ${WORKSPACE}/tmp
+            }
+        }
+        stage ('Retrieve Source Code') {
+            dir ('tmp') {
+                steps {
+                    sh "sudo sak4ci init  --management-nw '192.168.21.0/24'"
+                    sh "sudo sak4ci scm --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} -u ${GIT_URL} -C ${GIT_COMMIT}"
                 }
+            }
+        }
+    }
+    post {
+        always {
+            dir ('tmp') {
+                deleteDir()
             }
         }
     }
