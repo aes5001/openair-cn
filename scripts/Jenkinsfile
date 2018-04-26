@@ -31,8 +31,8 @@ pipeline {
             }
         }
         stage ('Retrieve Source Code') {
-            dir ('tmp') {
-                steps {
+            steps {
+                dir ('tmp') {
                     sh "sudo sak4ci init  --management-nw '192.168.21.0/24'"
                     sh "sudo sak4ci scm --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} -u ${GIT_URL} -C ${GIT_COMMIT}"
                 }
