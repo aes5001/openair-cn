@@ -30,6 +30,11 @@ pipeline {
                 echo "DNS1 Addr  is ${dns1}"
                 echo "DNS2 Addr  is ${dns2}"
                 echo "VM Display is ${vm_display}"
+                if (getBinding.hasVariable(${params.DNS1_ADDR})) {
+                    echo "DNS1 was a build params"
+                } else {
+                    echo "DNS1 is NOT a build params"
+                }
             }
         }
     }
