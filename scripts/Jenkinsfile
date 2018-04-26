@@ -27,7 +27,7 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 echo "Git URL    is ${GIT_URL}"
-                sh "mkdir ${WORKSPACE}/tmp"
+                sh "sudo mkdir -p ${WORKSPACE}/tmp"
             }
         }
         stage ('Retrieve Source Code') {
