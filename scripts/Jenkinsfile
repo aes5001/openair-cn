@@ -16,7 +16,7 @@ pipeline {
     environment {
         dns1 = "192.168.106.10"
         dns2 = "192.168.106.12"
-        vm_display="False"
+        vm_display = "False"
     }
 
     stages {
@@ -27,9 +27,10 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 echo "Git URL    is ${GIT_URL}"
-                echo "DNS1 Addr  is ${dn1}"
-                echo "DNS2 Addr  is ${dn2}"
-                echo "VM Display is ${vm_display}"
+                sh 'printenv | grep dns'
+                //echo "DNS1 Addr  is ${dn1}"
+                //echo "DNS2 Addr  is ${dn2}"
+                //echo "VM Display is ${vm_display}"
             }
         }
     }
