@@ -1,0 +1,28 @@
+// Temporary script to build OpenAirInterface Core Network
+// Author    : Raphael Defosseux
+// Copyright : OpenAirInterface Software Alliance (2018)
+// Version   : 0.1
+
+pipeline {
+    // Currently using abeille with Raphael's credentials
+    // We need to investigate how to use Orion concurrently with development efforts
+    agent {
+        label 'abeille'
+    }
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    stages {
+        stage ('Verify Parameters') {
+            steps {
+                echo 'Verify Parameters'
+                echo "Base URL   is ${JENKINS_URL}"
+                echo "Git Branch is ${GIT_BRANCH}"
+                echo "Git Commit is ${GIT_COMMIT}"
+                echo "Git URL    is ${GIT_URL}"
+            }
+        }
+    }
+}
