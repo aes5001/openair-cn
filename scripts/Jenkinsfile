@@ -40,7 +40,9 @@ pipeline {
     }
     post {
         always {
-            sh "cd tmp; sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+            dir ('tmp') {
+                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+            }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
         }
     }
