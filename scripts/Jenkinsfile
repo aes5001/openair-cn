@@ -23,10 +23,9 @@ pipeline {
         stage ('Verify Parameters') {
             steps {
                 echo 'Verify Parameters'
-                echo "Base URL   is ${JENKINS_URL}"
+                echo "Git URL    is ${GIT_URL}"
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
-                echo "Git URL    is ${GIT_URL}"
                 sh "sudo mkdir -p ${WORKSPACE}/tmp"
             }
         }
@@ -41,6 +40,7 @@ pipeline {
     }
     post {
         always {
+            sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
         }
     }
