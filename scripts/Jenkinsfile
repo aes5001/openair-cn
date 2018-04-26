@@ -28,7 +28,7 @@ pipeline {
                 echo "Git Commit is ${GIT_COMMIT}"
                 echo "Git URL    is ${GIT_URL}"
                 sh 'printenv | grep dns'
-                //echo "DNS1 Addr  is ${dn1}"
+                echo "DNS1 Addr  is ${dn1}"
                 //echo "DNS2 Addr  is ${dn2}"
                 //echo "VM Display is ${vm_display}"
             }
