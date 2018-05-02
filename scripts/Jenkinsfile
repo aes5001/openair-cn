@@ -26,6 +26,11 @@ pipeline {
                 echo "Git URL    is ${GIT_URL}"
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
+                if (${params.nodeToUse} == '') {
+                   echo "Node is not defined"
+                } else {
+                   echo "Node is defined w/ ${params.nodeToUse}"
+                }
                 sh "sudo mkdir -p ${WORKSPACE}/tmp"
             }
         }
