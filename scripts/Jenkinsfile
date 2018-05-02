@@ -27,7 +27,7 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 script {
-                    if (params.nodeToUse == '') {
+                    if (params.nodeToUse == '' || params.nodeToUse == null) {
                        echo "Node is not defined"
                     } else {
                        echo "Node is defined w/ ${params.nodeToUse}"
