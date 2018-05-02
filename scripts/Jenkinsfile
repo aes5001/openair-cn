@@ -27,6 +27,8 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 script {
+                    def message = "Build job #" + BUILD_ID + " completed"
+                    echo "${message}"
                     if (params.nodeToUse == '' || params.nodeToUse == null) {
                        echo "Node is not defined"
                     } else {
