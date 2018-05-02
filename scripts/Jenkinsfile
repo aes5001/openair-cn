@@ -27,8 +27,6 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 script {
-                    def message = "Build job #" + BUILD_ID + " completed"
-                    echo "${message}"
                     if (params.nodeToUse == '' || params.nodeToUse == null) {
                        echo "Node is not defined"
                     } else {
@@ -49,7 +47,10 @@ pipeline {
     }
     post {
         success {
-            updateGithubCommitStatus(currentBuild, "Build job completed")
+            script {
+                def message = "Build job #" + BUILD_ID + " completed"
+                updateGithubCommitStatus(currentBuild, message)
+            }
         }
         failure {
             updateGithubCommitStatus(currentBuild, "One step of job failed")
