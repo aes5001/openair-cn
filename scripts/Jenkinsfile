@@ -14,7 +14,13 @@ pipeline {
         timestamps()
     }
     environment {
-        dns1 = "192.168.106.10"
+        script {
+            if (params.dns1Addr == "" || params.dns1Addr == null) {
+                dns1 = "192.168.106.10"
+            } else {
+                dns1 = params.dns1Addr
+            }
+        }
         dns2 = "192.168.106.12"
         vm_display = "False"
     }
@@ -26,13 +32,15 @@ pipeline {
                 echo "Git URL    is ${GIT_URL}"
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
-                script {
-                    if (params.nodeToUse == '' || params.nodeToUse == null) {
-                       echo "Node is not defined"
-                    } else {
-                       echo "Node is defined w/ ${params.nodeToUse}"
-                    }
-                }
+                echo "DNS1 Addr  is ${dns1}"
+                echo "DNS2 Addr  is ${dns2}"
+//                script {
+//                    if (params.nodeToUse == '' || params.nodeToUse == null) {
+//                       echo "Node is not defined"
+//                    } else {
+//                       echo "Node is defined w/ ${params.nodeToUse}"
+//                    }
+//                }
                 sh "sudo mkdir -p ${WORKSPACE}/tmp"
             }
         }
@@ -53,13 +61,23 @@ pipeline {
             }
         }
         failure {
-            updateGithubCommitStatus(currentBuild, "One step of job failed")
+            script {
+                def message = "Build job #" + BUILD_ID + " : One step of job failed"
+                updateGithubCommitStatus(currentBuild, message)
+            }
         }
         unstable {
-            updateGithubCommitStatus(currentBuild, "One step of job is unstable")
+            script {
+                def message = "Build job #" + BUILD_ID + " : One step of job is unstable"
+                updateGithubCommitStatus(currentBuild, message)
+            }
         }
         aborted {
             updateGithubCommitStatus(currentBuild, "Build job aborted: pipeline script issue?")
+            script {
+                def message = "Build job #" + BUILD_ID + " aborted: pipeline script issue?"
+                updateGithubCommitStatus(currentBuild, message)
+            }
         }
         cleanup {
             dir ('tmp') {
