@@ -46,9 +46,11 @@ pipeline {
             }
         }
         stage ('Start MME VM') {
-            timeout(time: 2, unit: 'MINUTES') {
+            steps {
                 dir ('tmp') {
-                    sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type mme --job-name ${JOB_NAME} --template-domain ${mme_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dn1} --dns2 ${dns2}"
+                    timeout(time: 2, unit: 'MINUTES') {
+                        sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type mme --job-name ${JOB_NAME} --template-domain ${mme_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dn1} --dns2 ${dns2}"
+                    }
                 }
             }
         }
