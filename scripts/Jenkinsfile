@@ -14,15 +14,10 @@ pipeline {
         timestamps()
     }
     environment {
-        script {
-            if (params.dns1Addr == "" || params.dns1Addr == null) {
-                dns1 = "192.168.106.10"
-            } else {
-                dns1 = params.dns1Addr
-            }
-        }
+        dns1 = "192.168.106.10"
         dns2 = "192.168.106.12"
         vm_display = "False"
+        mme_vm_template = "template${JOB_NAME}"
     }
 
     stages {
@@ -32,8 +27,6 @@ pipeline {
                 echo "Git URL    is ${GIT_URL}"
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
-                echo "DNS1 Addr  is ${dns1}"
-                echo "DNS2 Addr  is ${dns2}"
 //                script {
 //                    if (params.nodeToUse == '' || params.nodeToUse == null) {
 //                       echo "Node is not defined"
@@ -49,6 +42,13 @@ pipeline {
                 dir ('tmp') {
                     sh "sudo sak4ci init  --management-nw '192.168.21.0/24'"
                     sh "sudo sak4ci scm --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} -u ${GIT_URL} -C ${GIT_COMMIT}"
+                }
+            }
+        }
+        stage ('Start MME VM') {
+            timeout(time: 2, unit: 'MINUTES') {
+                dir ('tmp') {
+                    sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type mme --job-name ${JOB_NAME} --template-domain ${mme_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dn1} --dns2 ${dns2}"
                 }
             }
         }
