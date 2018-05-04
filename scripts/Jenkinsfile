@@ -65,17 +65,15 @@ pipeline {
             }
         }
         stage('Install libs & sw') {
-            dir ('tmp') {
-                parallel('MME SW' : {
-                    timeout(time: 15, unit: 'MINUTES') {
-                        sh "sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
-                    }
-                }, 'HSS SW' : {
-                    timeout(time: 15, unit: 'MINUTES') {
-                        sh "sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
-                    }
-                })
-            }
+            parallel('MME SW' : {
+                timeout(time: 15, unit: 'MINUTES') {
+                    sh "cd tmp && sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                }
+            }, 'HSS SW' : {
+                timeout(time: 15, unit: 'MINUTES') {
+                    sh "cd tmp && sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                }
+            })
         }
     }
     post {
