@@ -70,7 +70,7 @@ pipeline {
                     steps {
                         dir ('tmp') {
                             timeout(time: 15, unit: 'MINUTES') {
-                                sh "cd tmp && sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                                sh "sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                             }
                         }
                     }
@@ -79,7 +79,7 @@ pipeline {
                     steps {
                         dir ('tmp') {
                             timeout(time: 15, unit: 'MINUTES') {
-                                sh "cd tmp && sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                                sh "sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                             }
                         }
                     }
@@ -118,7 +118,8 @@ pipeline {
                 sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
             }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
-            sh "sudo rm -Rf /var/lib/libvirt/images/*${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
+            sh "sudo rm -Rf /var/lib/libvirt/images/mme0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
+            sh "sudo rm -Rf /var/lib/libvirt/images/hss0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
         }
     }
 }
