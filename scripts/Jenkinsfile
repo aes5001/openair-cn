@@ -69,7 +69,7 @@ pipeline {
                 stage ('MME SW') {
                     steps {
                         dir ('tmp') {
-                            timeout(time: 15, unit: 'MINUTES') {
+                            timeout(time: 25, unit: 'MINUTES') {
                                 sh "sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                             }
                         }
@@ -78,9 +78,45 @@ pipeline {
                 stage ('HSS SW') {
                     steps {
                         dir ('tmp') {
-                            timeout(time: 15, unit: 'MINUTES') {
+                            timeout(time: 25, unit: 'MINUTES') {
                                 sh "sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                             }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build Core Network Functions') {
+            parallel {
+                stage ('Build MME') {
+                    steps {
+                        dir ('tmp') {
+                            sh "sudo sak4ci build-nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage ('Build HSS') {
+                    steps {
+                        dir ('tmp') {
+                            sh "sudo sak4ci build-nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Generate CN configs') {
+            parallel {
+                stage ('Config MME') {
+                    steps {
+                        dir ('tmp') {
+                            sh "sudo sak4ci nf-configure --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage ('Config HSS') {
+                    steps {
+                        dir ('tmp') {
+                            sh "sudo sak4ci nf-configure --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                         }
                     }
                 }
