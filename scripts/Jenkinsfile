@@ -18,6 +18,7 @@ pipeline {
         dns2 = "192.168.106.12"
         vm_display = "False"
         mme_vm_template = "template${JOB_NAME}"
+        hss_vm_template = "template${JOB_NAME}"
     }
 
     stages {
@@ -54,6 +55,30 @@ pipeline {
                 }
             }
         }
+        stage ('Start HSS VM') {
+            steps {
+                dir ('tmp') {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type hss --job-name ${JOB_NAME} --template-domain ${hss_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dns1} --dns2 ${dns2}"
+                    }
+                }
+            }
+        }
+        stage('Install libs & sw') {
+            steps {
+                dir ('tmp') {
+                    parallel('MME SW' : {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh "sudo sak4ci install-libs-packs4nf --nf-type mme --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    }, 'HSS SW' : {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh "sudo sak4ci install-libs-packs4nf --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    })
+                }
+            }
+        }
     }
     post {
         success {
@@ -86,6 +111,7 @@ pipeline {
                 sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
             }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
+            sh "sudo rm -Rf /var/lib/libvirt/images/*${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
         }
     }
 }
