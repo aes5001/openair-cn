@@ -835,25 +835,21 @@ check_install_hss_software() {
     "ubuntu14.04")
       PACKAGE_LIST="\
         php5 \
-        phpmyadmin \
         python-pexpect \
         libapache2-mod-php*"
       ;;
     "ubuntu16.04")
       PACKAGE_LIST="\
         php \
-        phpmyadmin \
         python-pexpect \
         libapache2-mod-php*"
       ;;
     "rhel7" | "centos7")
       PACKAGE_LIST="\
-        phpmyadmin \
         pexpect"
       ;;
     "fedora")
       PACKAGE_LIST="\
-        phpmyadmin \
         python2-pexpect"
       ;;
     *)
@@ -1006,7 +1002,6 @@ check_install_mme_software() {
   if [[ "$OS_DISTRO" == "ubuntu" ]]; then
     PACKAGE_LIST="\
       check \
-      phpmyadmin \
       python-dev \
       python-pexpect \
       unzip"
@@ -1014,7 +1009,6 @@ check_install_mme_software() {
     PACKAGE_LIST="\
       check \
       check-devel \
-      phpmyadmin \
       python-devel \
       pexpect \
       psmisc \
@@ -1023,7 +1017,6 @@ check_install_mme_software() {
     PACKAGE_LIST="\
       check \
       check-devel \
-      phpmyadmin \
       python-devel \
       python2-pexpect \
       unzip"
