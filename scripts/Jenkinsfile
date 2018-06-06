@@ -17,8 +17,11 @@ pipeline {
         dns1 = "192.168.106.10"
         dns2 = "192.168.106.12"
         vm_display = "False"
-        mme_vm_template = "template${JOB_NAME}"
-        hss_vm_template = "template${JOB_NAME}"
+        vm_template = "CN-Mobility-CI"
+        spgw_kernel_version = "kernel-4.9"
+        mme_vm_template = "template${vm_template}"
+        hss_vm_template = "template${vm_template}"
+        spgw_vm_template = "template${vm_template}-${spgw_kernel_version}"
     }
 
     stages {
@@ -60,6 +63,15 @@ pipeline {
                 dir ('tmp') {
                     timeout(time: 2, unit: 'MINUTES') {
                         sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type hss --job-name ${JOB_NAME} --template-domain ${hss_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dns1} --dns2 ${dns2}"
+                    }
+                }
+            }
+        }
+        stage ('Start SPGW VM') {
+            steps {
+                dir ('tmp') {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        sh "sudo sak4ci install-vm --clone-template True  --snapshot yes --start-vm True --vm-display ${vm_display} --nf-type spgw --job-name ${JOB_NAME} --template-domain ${spgw_vm_template} --build-id ${BUILD_NUMBER} --dns1 ${dns1} --dns2 ${dns2}"
                     }
                 }
             }
@@ -116,7 +128,8 @@ pipeline {
                 stage ('Config HSS') {
                     steps {
                         dir ('tmp') {
-                            sh "sudo sak4ci nf-configure --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                            //sh "sudo sak4ci nf-configure --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                            echo "Bypassing HSS configuration for the moment"
                         }
                     }
                 }
@@ -151,11 +164,9 @@ pipeline {
         }
         cleanup {
             dir ('tmp') {
-                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} --complete True"
             }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
-            sh "sudo rm -Rf /var/lib/libvirt/images/mme0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
-            sh "sudo rm -Rf /var/lib/libvirt/images/hss0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
         }
     }
 }
