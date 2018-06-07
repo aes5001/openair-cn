@@ -31,14 +31,6 @@ pipeline {
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
                 echo "Node       is ${NODE_NAME}"
-                echo "Node Label is ${NODE_LABELS}"
-//                script {
-//                    if (params.nodeToUse == '' || params.nodeToUse == null) {
-//                       echo "Node is not defined"
-//                    } else {
-//                       echo "Node is defined w/ ${params.nodeToUse}"
-//                    }
-//                }
                 sh "sudo mkdir -p ${WORKSPACE}/tmp"
             }
         }
@@ -191,8 +183,20 @@ pipeline {
         }
         cleanup {
             dir ('tmp') {
-                //sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} --complete True"
-                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                script {
+                    if ("abeille".equals(env.NODE_NAME)) {
+                        sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} --complete True"
+                    }
+                    if ("orion".equals(env.NODE_NAME)) {
+                        sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        sh "sudo virsh undefine mme0${JOB_NAME}b${BUILD_NUMBER}"
+                        sh "sudo virsh undefine hss0${JOB_NAME}b${BUILD_NUMBER}"
+                        sh "sudo virsh undefine spgw0${JOB_NAME}b${BUILD_NUMBER}"
+                        sh "sudo rm -Rf /var/lib/libvirt/images/mme0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
+                        sh "sudo rm -Rf /var/lib/libvirt/images/mme0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
+                        sh "sudo rm -Rf /var/lib/libvirt/images/spgw0${JOB_NAME}b${BUILD_NUMBER}-snap.qcow2"
+                    }
+                }
             }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
         }
