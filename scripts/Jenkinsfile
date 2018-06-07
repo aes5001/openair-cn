@@ -4,10 +4,8 @@
 // Version   : 0.1
 
 pipeline {
-    // Currently using abeille with Raphael's credentials
-    // We need to investigate how to use Orion concurrently with development efforts
     agent {
-        label 'abeille'
+        label 'orion'
     }
     options {
         disableConcurrentBuilds()
@@ -17,7 +15,8 @@ pipeline {
         dns1 = "192.168.106.10"
         dns2 = "192.168.106.12"
         vm_display = "False"
-        vm_template = "CN-Mobility-CI"
+        //vm_template = "CN-Mobility-CI"
+        vm_template = "CN-CI-4G"
         spgw_kernel_version = "kernel-4.9"
         mme_vm_template = "template${vm_template}"
         hss_vm_template = "template${vm_template}"
@@ -31,6 +30,8 @@ pipeline {
                 echo "Git URL    is ${GIT_URL}"
                 echo "Git Branch is ${GIT_BRANCH}"
                 echo "Git Commit is ${GIT_COMMIT}"
+                echo "Node       is ${NODE_NAME}"
+                echo "Node Label is ${NODE_LABELS}"
 //                script {
 //                    if (params.nodeToUse == '' || params.nodeToUse == null) {
 //                       echo "Node is not defined"
@@ -96,6 +97,16 @@ pipeline {
                         }
                     }
                 }
+                stage ('SPGW SW') {
+                    steps {
+                        dir ('tmp') {
+                            timeout(time: 25, unit: 'MINUTES') {
+                                //sh "sudo sak4ci install-libs-packs4nf --nf-type spgw --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                                echo "Bypassing SPGW Install due to errors"
+                            }
+                        }
+                    }
+                }
             }
         }
         stage('Build Core Network Functions') {
@@ -111,6 +122,14 @@ pipeline {
                     steps {
                         dir ('tmp') {
                             sh "sudo sak4ci build-nf --nf-type hss --keep-vm-alive True --build-type Release --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage ('Build SPGW') {
+                    steps {
+                        dir ('tmp') {
+                            //sh "sudo sak4ci build-nf --nf-type spgw --keep-vm-alive True --build-type Release --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                            echo "Bypassing SPGW Build for the moment"
                         }
                     }
                 }
@@ -130,6 +149,14 @@ pipeline {
                         dir ('tmp') {
                             //sh "sudo sak4ci nf-configure --nf-type hss --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
                             echo "Bypassing HSS configuration for the moment"
+                        }
+                    }
+                }
+                stage ('Config SPGW') {
+                    steps {
+                        dir ('tmp') {
+                            //sh "sudo sak4ci nf-configure --nf-type spgw --keep-vm-alive True --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
+                            echo "Bypassing SPGW configuration for the moment"
                         }
                     }
                 }
@@ -164,7 +191,8 @@ pipeline {
         }
         cleanup {
             dir ('tmp') {
-                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} --complete True"
+                //sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER} --complete True"
+                sh "sudo sak4ci clean-build --job-name ${JOB_NAME} --build-id ${BUILD_NUMBER}"
             }
             sh "sudo rm -Rf ${WORKSPACE}/tmp"
         }
