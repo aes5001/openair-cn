@@ -27,24 +27,17 @@
    \version 0.1
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
 #include <stdint.h>
-#include <pthread.h>
+#include <unistd.h>
 
-#include "bstrlib.h"
-
-#include "log.h"
+#include "common_defs.h"
 #include "common_types.h"
 #include "intertask_interface.h"
-#include "common_defs.h"
 #include "s6a_defs.h"
 #include "s6a_messages.h"
 #include "assertions.h"
 #include "dynamic_memory_check.h"
-#include "mme_config.h"
+#include "log.h"
 
 #define NB_MAX_TRIES  (8)
 
@@ -108,18 +101,18 @@ s6a_fd_new_peer (
     return RETURNerror;
   }
 
-  if (fd_g_config->cnf_diamid ) {
-    free (fd_g_config->cnf_diamid);
-    fd_g_config->cnf_diamid_len = 0;
-  }
+//  if (fd_g_config->cnf_diamid ) {
+//    free (fd_g_config->cnf_diamid);
+//    fd_g_config->cnf_diamid_len = 0;
+//  }
 
-  DevAssert (gethostname (host_name, 100) == 0);
-  host_name_len = strlen (host_name);
-  host_name[host_name_len] = '.';
-  host_name[host_name_len + 1] = '\0';
-  strcat (host_name, (const char *)mme_config.realm->data);
-  fd_g_config->cnf_diamid = strdup (host_name);
-  fd_g_config->cnf_diamid_len = strlen (fd_g_config->cnf_diamid);
+//  DevAssert (gethostname (host_name, 100) == 0);
+//  host_name_len = strlen (host_name);
+//  host_name[host_name_len] = '.';
+//  host_name[host_name_len + 1] = '\0';
+//  strcat (host_name, (const char *)mme_config.realm->data);
+//  fd_g_config->cnf_diamid = strdup (host_name);
+//  fd_g_config->cnf_diamid_len = strlen (fd_g_config->cnf_diamid);
   OAILOG_DEBUG (LOG_S6A, "Diameter identity of MME: %s with length: %zd\n", fd_g_config->cnf_diamid, fd_g_config->cnf_diamid_len);
   bstring                                 hss_name = bstrcpy(mme_config.s6a_config.hss_host_name);
   bconchar(hss_name, '.');
@@ -152,13 +145,16 @@ s6a_fd_new_peer (
   struct peer_hdr  *peer      = NULL;
   int               nb_tries  = 0;
   int               timeout   = fd_g_config->cnf_timer_tc;
+
   for (nb_tries = 0; nb_tries < NB_MAX_TRIES; nb_tries++) {
     OAILOG_DEBUG (LOG_S6A, "S6a peer connection attempt %d / %d\n",
                   1 + nb_tries, NB_MAX_TRIES);
     ret = fd_peer_getbyid( diamid, diamidlen, 0, &peer );
+
     if (peer && peer->info.config.pic_tctimer != 0) {
         timeout = peer->info.config.pic_tctimer;
     }
+
     if (!ret) {
       if (peer) {
         ret = fd_peer_get_state(peer);
@@ -180,7 +176,7 @@ s6a_fd_new_peer (
             fflush(fp);
             fclose(fp);
           }
-          bdestroy_wrapper (&hss_name);
+          bdestroy(hss_name);
           return RETURNok;
         } else {
           OAILOG_DEBUG (LOG_S6A, "S6a peer state is %d\n", ret);
@@ -192,7 +188,9 @@ s6a_fd_new_peer (
     sleep(timeout);
   }
   bdestroy(hss_name);
-  free_wrapper((void **) &fd_g_config->cnf_diamid);
+  if(fd_g_config->cnf_diamid){
+    free_wrapper((void **) &fd_g_config->cnf_diamid);
+  }
   fd_g_config->cnf_diamid_len = 0;
   return RETURNerror;
 #endif

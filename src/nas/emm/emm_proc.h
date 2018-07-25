@@ -82,10 +82,10 @@ typedef enum {
 /****************************************************************************/
 
 typedef struct emm_attach_request_ies_s {
-  bool                           is_initial;
   emm_proc_attach_type_t         type;
   additional_update_type_t       additional_update_type;
   bool                           is_native_sc;
+  bool                           is_new;
   ksi_t                          ksi;
   bool                           is_native_guti;
   guti_t                        *guti;
@@ -94,7 +94,9 @@ typedef struct emm_attach_request_ies_s {
   tai_t                         *last_visited_registered_tai;
   tai_t                         *originating_tai;
   ecgi_t                        *originating_ecgi;
-  ue_network_capability_t        ue_network_capability;
+
+  /* Making optional like MS network request. */
+  ue_network_capability_t       *ue_network_capability;
   ms_network_capability_t       *ms_network_capability;
   drx_parameter_t               *drx_parameter;
   bstring                        esm_msg;
@@ -105,6 +107,7 @@ typedef struct emm_detach_request_ies_s {
   emm_proc_detach_type_t         type;
   bool                           switch_off;
   bool                           is_native_sc;
+  bool                           is_initial;
   ksi_t                          ksi;
   guti_t                       * guti;
   imsi_t                       * imsi;
@@ -113,10 +116,10 @@ typedef struct emm_detach_request_ies_s {
 } emm_detach_request_ies_t;
 
 typedef struct emm_tau_request_ies_s {
-  bool                           is_initial;
-  emm_proc_attach_type_t         type;
   EpsUpdateType                  eps_update_type;
+  uint8_t                        nas_ul_count;
   bool                           is_native_sc;
+  bool                           is_initial;
   ksi_t                          ksi;
   guti_t                         old_guti;
 
@@ -126,6 +129,9 @@ typedef struct emm_tau_request_ies_s {
   guti_t                        *additional_guti;
   ue_network_capability_t       *ue_network_capability;
   tai_t                         *last_visited_registered_tai;
+  tai_t                         *originating_tai;
+  ecgi_t                        *originating_ecgi;
+
   drx_parameter_t               *drx_parameter;
   bool                           is_ue_radio_capability_information_update_needed;
   eps_bearer_context_status_t   *eps_bearer_context_status;
@@ -136,6 +142,8 @@ typedef struct emm_tau_request_ies_s {
   supported_codec_list_t        *supported_codecs;
   additional_update_type_t      *additional_updatetype;
   guti_type_t                   *old_guti_type;
+
+  bstring                        complete_tau_request;
 
   nas_message_decode_status_t    decode_status;
 } emm_tau_request_ies_t;
@@ -178,10 +186,10 @@ int emm_proc_status(mme_ue_s1ap_id_t ue_id, emm_cause_t emm_cause);
 void free_emm_attach_request_ies(emm_attach_request_ies_t ** const params);
 
 int emm_proc_attach_request(mme_ue_s1ap_id_t ue_id,
-                            const bool ctx_is_new,
-                            emm_attach_request_ies_t * const params);
+                            emm_attach_request_ies_t * const params,
+                            emm_data_context_t ** duplicate_emm_ue_ctx_pP);
 
-int _emm_attach_reject (emm_context_t *emm_context, struct nas_base_proc_s * nas_base_proc);
+int _emm_attach_reject (emm_data_context_t *emm_context, struct nas_base_proc_s * nas_base_proc);
 
 int emm_proc_attach_reject(mme_ue_s1ap_id_t ue_id, emm_cause_t emm_cause);
 
@@ -194,13 +202,20 @@ int emm_proc_attach_complete (
 void free_emm_tau_request_ies(emm_tau_request_ies_t ** const ies);
 
 int emm_proc_tracking_area_update_request (
-        const mme_ue_s1ap_id_t ue_id,
-        emm_tau_request_ies_t *ies,
-        int *emm_cause);
+  const mme_ue_s1ap_id_t ue_id,
+  emm_tau_request_ies_t *ies,
+  const int gea,
+  const bool gprs_present,
+  int *emm_cause,
+  emm_data_context_t ** emm_context_pP);
 
 int emm_proc_tracking_area_update_reject (
   const mme_ue_s1ap_id_t ue_id,
   const int emm_cause);
+
+int
+emm_proc_tracking_area_update_complete (
+  mme_ue_s1ap_id_t ue_id);
 
 int emm_proc_service_reject (const mme_ue_s1ap_id_t ue_id, const int emm_cause);
 /*
@@ -210,7 +225,7 @@ int emm_proc_service_reject (const mme_ue_s1ap_id_t ue_id, const int emm_cause);
  */
 
 void free_emm_detach_request_ies(emm_detach_request_ies_t ** const ies);
-int emm_proc_detach(mme_ue_s1ap_id_t ue_id, emm_proc_detach_type_t type);
+int emm_proc_detach(mme_ue_s1ap_id_t ue_id, emm_proc_detach_type_t detach_type, int emm_cause);
 int emm_proc_detach_request(mme_ue_s1ap_id_t ue_id, emm_detach_request_ies_t * params);
 
 /*
@@ -218,11 +233,11 @@ int emm_proc_detach_request(mme_ue_s1ap_id_t ue_id, emm_detach_request_ies_t * p
  *              Identification procedure
  * --------------------------------------------------------------------------
  */
-struct emm_context_s;
+struct emm_data_context_s;
 
 int
 emm_proc_identification (
-  struct emm_context_s     * const emm_context,
+  struct emm_data_context_s     * const emm_context,
   nas_emm_proc_t           * const emm_proc,
   const identity_type2_t     type,
   success_cb_t               success,
@@ -241,7 +256,7 @@ int emm_proc_identification_complete(const mme_ue_s1ap_id_t ue_id,
 
 int
 emm_proc_authentication_ksi (
-  struct emm_context_s *emm_context,
+  struct emm_data_context_s *emm_context,
   nas_emm_specific_proc_t  * const emm_specific_proc,
   ksi_t ksi,
   const uint8_t   * const rand,
@@ -251,7 +266,7 @@ emm_proc_authentication_ksi (
 
 int
 emm_proc_authentication (
-  struct emm_context_s *emm_context,
+  struct emm_data_context_s *emm_context,
   nas_emm_specific_proc_t  * const emm_specific_proc,
   success_cb_t success,
   failure_cb_t failure);
@@ -262,7 +277,7 @@ int emm_proc_authentication_failure (mme_ue_s1ap_id_t ue_id, int emm_cause,
 int emm_proc_authentication_complete(mme_ue_s1ap_id_t ue_id, int emm_cause,
     const_bstring const res);
 
-int emm_attach_security(struct emm_context_s *emm_context);
+int emm_attach_security(struct emm_data_context_s *emm_context);
 
 /*
  * --------------------------------------------------------------------------
@@ -271,7 +286,7 @@ int emm_attach_security(struct emm_context_s *emm_context);
  */
 
 int emm_proc_security_mode_control (
-  struct emm_context_s *emm_context,
+  struct emm_data_context_s *emm_context,
   nas_emm_specific_proc_t  * const emm_specific_proc,
   ksi_t ksi,
   success_cb_t success,
@@ -280,7 +295,7 @@ int emm_proc_security_mode_complete(mme_ue_s1ap_id_t ue_id, const imeisv_mobile_
 int emm_proc_security_mode_reject(mme_ue_s1ap_id_t ue_id);
 
 void
-_clear_emm_ctxt(emm_context_t *emm_ctx);
+_clear_emm_ctxt(emm_data_context_t *emm_ctx);
 /*
  *---------------------------------------------------------------------------
  *             Network indication handlers

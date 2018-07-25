@@ -98,7 +98,7 @@ EmmDeregisteredInitiated (
 {
   OAILOG_FUNC_IN (LOG_NAS_EMM);
   int                                     rc = RETURNerror;
-  emm_context_t                          *emm_ctx = evt->ctx;
+  emm_data_context_t                          *emm_ctx = evt->ctx;
 
   assert (emm_fsm_get_state (emm_ctx) == EMM_DEREGISTERED_INITIATED);
 
@@ -134,10 +134,10 @@ EmmDeregisteredInitiated (
     MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_REJ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     break;
 
-  case _EMMREG_ATTACH_ABORT:
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
-    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    break;
+//  case _EMMREG_ATTACH_ABORT:
+//    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
+//    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+//    break;
 
   case _EMMREG_DETACH_INIT:
     OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_DETACH_INIT is not valid\n");
@@ -158,14 +158,20 @@ EmmDeregisteredInitiated (
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_CNF ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     rc = emm_fsm_set_state (evt->ue_id, evt->ctx, EMM_DEREGISTERED);
 
-    //if ((emm_ctx) && (evt->notify) && (evt->u.detach.proc) && (evt->u.detach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)) {
-    //  rc = (*evt->u.detach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)(emm_ctx);
-    //}
+    /** No specific procedure is initiated. */
+
     if (evt->free_proc) {
       nas_delete_detach_procedure(emm_ctx);
     }
+    /*
+     * Clear the EMM context for MME-triggered implicit detaches.
+     * todo: make it optional!
+     * Clear the ESM message, if exists.
+     */
+    bdestroy_wrapper(&emm_ctx->esm_msg);
+    // Release emm and esm context
+    _clear_emm_ctxt(emm_ctx);
     break;
-
   case _EMMREG_TAU_REQ:
     OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED_INITIATED - Primitive _EMMREG_TAU_REQ is not valid\n");
     MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_TAU_REQ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
@@ -222,6 +228,7 @@ EmmDeregisteredInitiated (
   case _EMMREG_LOWERLAYER_RELEASE:
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_LOWERLAYER_RELEASE ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     nas_delete_all_emm_procedures(emm_ctx);
+    nas_delete_all_esm_procedures(emm_ctx);
     rc = RETURNok;
     break;
 

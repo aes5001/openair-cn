@@ -278,6 +278,7 @@ int nas_message_decrypt (
     nas_message_security_header_t * header,
     size_t length,
     void *security,
+    uint8_t *ul_nas_count,
     nas_message_decode_status_t * status)
 {
   OAILOG_FUNC_IN (LOG_NAS);
@@ -288,6 +289,8 @@ int nas_message_decrypt (
    * Decode the header
    */
   int                                     size = nas_message_header_decode (inbuf, header, length, status, &is_sr);
+
+  *ul_nas_count = header->sequence_number;
 
   if (size < 0) {
     OAILOG_DEBUG (LOG_NAS, "MESSAGE TOO SHORT\n");
@@ -380,6 +383,7 @@ int nas_message_decode (
     nas_message_t * msg,
     size_t length,
     void *security,
+    uint8_t *ul_seq_no,
     nas_message_decode_status_t * status)
 {
   OAILOG_FUNC_IN (LOG_NAS);
@@ -399,6 +403,11 @@ int nas_message_decode (
     status->security_context_available = 1;
   }
   size  = nas_message_header_decode (buffer, &msg->header, length, status, &is_sr);
+
+  if(ul_seq_no){
+    *ul_seq_no = msg->header.sequence_number;
+    OAILOG_DEBUG(LOG_NAS, "Header seq no of uplink message %d: \n", *ul_seq_no);
+  }
 
   OAILOG_DEBUG (LOG_NAS, "nas_message_header_decode returned size %d\n", size);
 
@@ -1062,6 +1071,8 @@ static int _nas_message_decrypt (
   case SECURITY_HEADER_TYPE_SERVICE_REQUEST:
   case SECURITY_HEADER_TYPE_INTEGRITY_PROTECTED:
   case SECURITY_HEADER_TYPE_INTEGRITY_PROTECTED_NEW:
+    // todo: currently also in this case trying to get the security context from the source MME
+  case SECURITY_HEADER_TYPE_INTEGRITY_PROTECTED_CYPHERED:
     OAILOG_DEBUG (LOG_NAS, "No decryption of message length %lu according to security header type 0x%02x\n", length, security_header_type);
     memcpy (dest, src, length);
     DECODE_U8 (dest, *(uint8_t *) (&header), size);
@@ -1069,7 +1080,6 @@ static int _nas_message_decrypt (
     //LOG_FUNC_RETURN (LOG_NAS, length);
     break;
 
-  case SECURITY_HEADER_TYPE_INTEGRITY_PROTECTED_CYPHERED:
   case SECURITY_HEADER_TYPE_INTEGRITY_PROTECTED_CYPHERED_NEW:
     if ( emm_security_context) {
       direction = emm_security_context->direction_decode;

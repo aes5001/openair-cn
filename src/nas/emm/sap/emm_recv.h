@@ -93,7 +93,6 @@ emm_recv_attach_request (
     const ecgi_t             * const originating_ecgi,
     attach_request_msg       * const msg,
     const bool                       is_initial,
-    const bool                       ctx_is_new,
     int * const emm_cause,
     const nas_message_decode_status_t  * decode_status);
 
@@ -111,11 +110,18 @@ int emm_recv_detach_request(
     const nas_message_decode_status_t  * const decode_status);
 
 int emm_recv_tracking_area_update_request(
-    const mme_ue_s1ap_id_t                     ueid,
-    tracking_area_update_request_msg   * const msg,
-    const bool                                 is_initial,
-    int                                * const emm_cause,
-    const nas_message_decode_status_t  * const decode_status);
+    const mme_ue_s1ap_id_t ue_id,
+    tracking_area_update_request_msg * const msg,
+    int * const emm_cause,
+    const bool is_initial,
+    const tai_t              * const originating_tai,
+    const ecgi_t             * const originating_ecgi,
+    const nas_message_decode_status_t  * const decode_status,
+    uint8_t                     nas_ul_count,
+    bstring nas_msg);
+
+int emm_recv_tracking_area_update_complete(mme_ue_s1ap_id_t ueid, const tracking_area_update_complete_msg *msg,
+    int *emm_cause, const nas_message_decode_status_t * status);
 
 int emm_recv_service_request(
     mme_ue_s1ap_id_t                           ueid,

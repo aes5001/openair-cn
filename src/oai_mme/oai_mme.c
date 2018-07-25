@@ -25,6 +25,7 @@
   \company Eurecom
   \email: lionel.gauthier@eurecom.fr
 */
+
 #include <stdio.h>
 #include <pthread.h>
 #include <inttypes.h>
@@ -69,6 +70,7 @@
 #include "timer.h"
 #include "mme_app_extern.h"
 #include "nas_defs.h"
+#include "s10_mme.h"
 #include "s11_mme.h"
 
 /* FreeDiameter headers for support of S6A interface */
@@ -95,12 +97,9 @@ main (
   CHECK_INIT_RETURN (mme_config_parse_opt_line (argc, argv, &mme_config));
 
   pid_dir = bstr2cstr(mme_config.pid_dir, 1);
-  if (pid_dir == NULL) {
-      pid_file_name = get_exe_absolute_path("/var/run");
-  } else {
-      pid_file_name = get_exe_absolute_path(pid_dir);
-      bcstrfree(pid_dir);
-  }
+  pid_dir = pid_dir ? pid_dir : "/var/run";
+  pid_file_name = get_exe_absolute_path(pid_dir);
+  bcstrfree(pid_dir);
 
 #if DAEMONIZE
   pid_t pid, sid; // Our process ID and Session ID
@@ -147,21 +146,28 @@ main (
   }
 #endif
 
-
-  CHECK_INIT_RETURN (itti_init (TASK_MAX, THREAD_MAX, MESSAGES_ID_MAX, tasks_info, messages_info, NULL, NULL));
-  MSC_INIT (MSC_MME, THREAD_MAX + TASK_MAX);
   /*
    * Calling each layer init function
    */
+  //CHECK_INIT_RETURN (log_init (&mme_config, oai_mme_log_specific));
+  CHECK_INIT_RETURN (itti_init (TASK_MAX, THREAD_MAX, MESSAGES_ID_MAX, tasks_info, messages_info,
+#if ENABLE_ITTI_ANALYZER
+          messages_definition_xml,
+#else
+          NULL,
+#endif
+          NULL));
+  MSC_INIT (MSC_MME, THREAD_MAX + TASK_MAX);
   CHECK_INIT_RETURN (nas_init (&mme_config));
   CHECK_INIT_RETURN (sctp_init (&mme_config));
   CHECK_INIT_RETURN (udp_init ());
+  CHECK_INIT_RETURN (s10_mme_init (&mme_config));
   CHECK_INIT_RETURN (s11_mme_init (&mme_config));
   CHECK_INIT_RETURN (s1ap_mme_init());
   CHECK_INIT_RETURN (mme_app_init (&mme_config));
   CHECK_INIT_RETURN (s6a_init (&mme_config));
-
   OAILOG_DEBUG(LOG_MME_APP, "MME app initialization complete\n");
+
   /*
    * Handle signals here
    */

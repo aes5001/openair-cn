@@ -28,8 +28,22 @@
 #ifndef FILE_PGW_LITE_PAA_SEEN
 #define FILE_PGW_LITE_PAA_SEEN
 
+#include "common_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void pgw_load_pool_ip_addresses       (void);
 int pgw_get_free_ipv4_paa_address     (struct in_addr * const addr_P);
 int pgw_release_free_ipv4_paa_address (const struct in_addr * const addr_P);
+int get_num_paa_ipv4_pool(void);
+int get_paa_ipv4_pool(const int block, struct in_addr * const range_low, struct in_addr * const range_high, struct in_addr * const netaddr, struct in_addr * const netmask, const struct ipv4_list_elm_s **out_of_nw);
+int get_paa_ipv4_pool_id(const struct in_addr ue_addr);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

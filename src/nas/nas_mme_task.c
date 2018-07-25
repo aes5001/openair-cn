@@ -65,12 +65,43 @@ static void *nas_intertask_interface (void *args_p)
       }
       break;
 
-    case MME_APP_CREATE_DEDICATED_BEARER_REQ:
-      nas_proc_create_dedicated_bearer(&MME_APP_CREATE_DEDICATED_BEARER_REQ (received_message_p));
+      /*
+       * We don't need the S-TMSI: if with the given UE_ID we can find an EMM context, that means,
+       * that a valid UE context could be matched for the UE context, and we can continue with it.
+       */
+    case NAS_INITIAL_UE_MESSAGE:{
+          nas_establish_ind_t                    *nas_est_ind_p = NULL;
+          nas_est_ind_p = &received_message_p->ittiMsg.nas_initial_ue_message.nas;
+          nas_proc_establish_ind (nas_est_ind_p->ue_id,
+              nas_est_ind_p->tai,
+              nas_est_ind_p->ecgi,
+              nas_est_ind_p->as_cause,
+              &nas_est_ind_p->initial_nas_msg);
+        }
+        break;
+
+    case MME_APP_ACTIVATE_BEARER_REQ:
+      nas_proc_activate_dedicated_bearer(&MME_APP_ACTIVATE_BEARER_REQ (received_message_p));
+      break;
+
+    case MME_APP_DEACTIVATE_BEARER_REQ:
+      nas_proc_deactivate_dedicated_bearer(&MME_APP_DEACTIVATE_BEARER_REQ (received_message_p));
+      break;
+
+    case MME_APP_E_RAB_FAILURE:
+      nas_proc_e_rab_failure(&MME_APP_E_RAB_FAILURE (received_message_p));
       break;
 
     case NAS_DOWNLINK_DATA_CNF:{
         nas_proc_dl_transfer_cnf (NAS_DL_DATA_CNF (received_message_p).ue_id, NAS_DL_DATA_CNF (received_message_p).err_code, &NAS_DL_DATA_REJ (received_message_p).nas_msg);
+      }
+      break;
+
+    case NAS_UPLINK_DATA_IND:{
+      nas_proc_ul_transfer_ind (NAS_UPLINK_DATA_IND (received_message_p).ue_id,
+          NAS_UPLINK_DATA_IND (received_message_p).tai,
+          NAS_UPLINK_DATA_IND (received_message_p).cgi,
+          &NAS_UPLINK_DATA_IND (received_message_p).nas_msg);
       }
       break;
 
@@ -84,6 +115,11 @@ static void *nas_intertask_interface (void *args_p)
     }
     break;
 
+    case NAS_PDN_CONFIG_FAIL:{
+      nas_proc_pdn_config_fail (&NAS_PDN_CONFIG_FAIL(received_message_p));
+    }
+    break;
+
     case NAS_PDN_CONNECTIVITY_FAIL:{
         nas_proc_pdn_connectivity_fail (&NAS_PDN_CONNECTIVITY_FAIL (received_message_p));
       }
@@ -94,8 +130,13 @@ static void *nas_intertask_interface (void *args_p)
       }
       break;
 
+    case NAS_PDN_DISCONNECT_RSP:{
+        nas_proc_pdn_disconnect_res (&NAS_PDN_DISCONNECT_RSP (received_message_p));
+      }
+      break;
+
     case NAS_IMPLICIT_DETACH_UE_IND:{
-        nas_proc_implicit_detach_ue_ind (NAS_IMPLICIT_DETACH_UE_IND (received_message_p).ue_id);
+        nas_proc_implicit_detach_ue_ind (NAS_IMPLICIT_DETACH_UE_IND (received_message_p).ue_id, NAS_IMPLICIT_DETACH_UE_IND (received_message_p).emm_cause, NAS_IMPLICIT_DETACH_UE_IND (received_message_p).detach_type);
       }
       break;
 
@@ -112,6 +153,16 @@ static void *nas_intertask_interface (void *args_p)
         nas_proc_authentication_info_answer (&S6A_AUTH_INFO_ANS(received_message_p));
       }
       break;
+
+    case NAS_CONTEXT_RES: {
+      nas_proc_context_res(&NAS_CONTEXT_RES(received_message_p));
+    }
+    break;
+
+    case NAS_CONTEXT_FAIL: {
+      nas_proc_context_fail(NAS_CONTEXT_FAIL(received_message_p).ue_id, NAS_CONTEXT_FAIL(received_message_p).cause);
+    }
+    break;
 
     case TERMINATE_MESSAGE:{
         nas_exit();

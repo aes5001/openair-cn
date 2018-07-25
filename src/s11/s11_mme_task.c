@@ -25,6 +25,7 @@
   \company Eurecom
   \email: lionel.gauthier@eurecom.fr
 */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -54,7 +55,9 @@
 static nw_gtpv2c_stack_handle_t             s11_mme_stack_handle = 0;
 // Store the GTPv2-C teid handle
 hash_table_ts_t                        *s11_mme_teid_2_gtv2c_teid_handle = NULL;
+
 static void s11_mme_exit (void);
+
 //------------------------------------------------------------------------------
 static nw_rc_t
 s11_mme_log_wrapper (
@@ -109,10 +112,24 @@ s11_mme_ulp_process_stack_req_cb (
           ret = s11_mme_handle_create_bearer_request (&s11_mme_stack_handle, pUlpApi);
           break;
 
+        case NW_GTP_DELETE_BEARER_REQ:
+          ret = s11_mme_handle_delete_bearer_request (&s11_mme_stack_handle, pUlpApi);
+          break;
+
+        case NW_GTP_DOWNLINK_DATA_NOTIFICATION:
+          ret = s11_mme_handle_downlink_data_notification (&s11_mme_stack_handle, pUlpApi);
+          break;
+
         default:
           OAILOG_WARNING (LOG_S11, "Received unhandled INITIAL_REQ_IND message type %d\n", pUlpApi->u_api_info.initialReqIndInfo.msgType);
       }
       break;
+
+    /** Timeout Handler */
+    case NW_GTPV2C_ULP_API_RSP_FAILURE_IND:
+       ret = s11_mme_handle_ulp_error_indicatior(&s11_mme_stack_handle, pUlpApi);
+       break;
+       // todo: add initial reqs --> CBR / UBR / DBR !
 
     default:
       OAILOG_WARNING (LOG_S11, "Received unhandled message type %d\n", pUlpApi->apiType);
@@ -175,9 +192,10 @@ s11_mme_stop_timer_wrapper (
   nw_gtpv2c_timer_mgr_handle_t tmrMgrHandle,
   nw_gtpv2c_timer_handle_t tmrHandle)
 {
-  long       timer_id= (long)tmrHandle;
-  void      *timeoutArg = NULL;
+  long                                    timer_id;
+  void                                   *timeoutArg = NULL;
 
+  timer_id = (long)tmrHandle;
   return ((timer_remove (timer_id, &timeoutArg) == 0) ? NW_OK : NW_FAILURE);
 }
 
@@ -204,6 +222,11 @@ s11_mme_thread (
       }
       break;
 
+    case S11_DELETE_BEARER_RESPONSE:{
+      s11_mme_delete_bearer_response (&s11_mme_stack_handle, &received_message_p->ittiMsg.s11_delete_bearer_response);
+      }
+      break;
+
     case S11_CREATE_SESSION_REQUEST:{
         s11_mme_create_session_request (&s11_mme_stack_handle, &received_message_p->ittiMsg.s11_create_session_request);
       }
@@ -221,6 +244,11 @@ s11_mme_thread (
 
     case S11_RELEASE_ACCESS_BEARERS_REQUEST:{
         s11_mme_release_access_bearers_request (&s11_mme_stack_handle, &received_message_p->ittiMsg.s11_release_access_bearers_request);
+      }
+      break;
+
+    case S11_DOWNLINK_DATA_NOTIFICATION_ACKNOWLEDGE:{
+        s11_mme_downlink_data_notification_acknowledge(&s11_mme_stack_handle, &received_message_p->ittiMsg.s11_downlink_data_notification_acknowledge);
       }
       break;
 
@@ -342,10 +370,6 @@ fail:
 //------------------------------------------------------------------------------
 static void s11_mme_exit (void)
 {
-  if (nwGtpv2cFinalize(s11_mme_stack_handle) != NW_OK) {
-    OAI_FPRINTF_ERR ("An error occurred during tear down of nwGtp s11 stack.\n");
-  }
-  if (hashtable_ts_destroy(s11_mme_teid_2_gtv2c_teid_handle) != HASH_TABLE_OK) {
-    OAI_FPRINTF_ERR("An error occured while destroying s11 teid hash table");
-  }
+  nwGtpv2cFinalize (s11_mme_stack_handle);
+  hashtable_ts_destroy(s11_mme_teid_2_gtv2c_teid_handle);
 }

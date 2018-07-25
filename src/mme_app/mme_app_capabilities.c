@@ -26,8 +26,10 @@
   \company Eurecom
   \email: lionel.gauthier@eurecom.fr
 */
+
 #include <pthread.h>
 #include <stdbool.h>
+
 #include <stdint.h>
 
 #include "bstrlib.h"
@@ -35,19 +37,15 @@
 #include "log.h"
 #include "intertask_interface.h"
 #include "mme_config.h"
-#include "mme_app_extern.h"
-#include "mme_app_ue_context.h"
 #include "mme_app_defs.h"
 #include "assertions.h"
-#include "common_types.h"
 #include "common_defs.h"
-#include "dynamic_memory_check.h"
 
 int
 mme_app_handle_s1ap_ue_capabilities_ind (
-  const itti_s1ap_ue_cap_ind_t const *s1ap_ue_cap_ind_pP)
+    const itti_s1ap_ue_cap_ind_t const *s1ap_ue_cap_ind_pP)
 {
-  ue_mm_context_t *ue_context_p = NULL;
+  ue_context_t *ue_context_p = NULL;
 
   OAILOG_FUNC_IN (LOG_MME_APP);
   DevAssert (s1ap_ue_cap_ind_pP );
@@ -75,6 +73,7 @@ mme_app_handle_s1ap_ue_capabilities_ind (
                "UE radio capabilities of length %d found and cached\n",
                ue_context_p->ue_radio_capability->slen);
 
-  unlock_ue_contexts(ue_context_p);
+//  unlock_ue_contexts(ue_context_p);
   OAILOG_FUNC_RETURN (LOG_MME_APP, RETURNok);
 }
+

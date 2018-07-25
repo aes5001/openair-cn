@@ -22,6 +22,8 @@
 #ifndef TRACKING_AREA_IDENTITY_SEEN
 #define TRACKING_AREA_IDENTITY_SEEN
 
+#include "3gpp_23.003.h"
+
 #define TRACKING_AREA_IDENTITY_MINIMUM_LENGTH 6
 #define TRACKING_AREA_IDENTITY_MAXIMUM_LENGTH 6
 
@@ -32,17 +34,6 @@ typedef uint16_t    tac_t;                                 /*!< \brief  Tracking
                                                                         a Tracking Area within a PLMN. This part of the tracking area identification
                                                                         shall be coded using a full hexadecimal representation. The following are
                                                                         reserved hexadecimal values of the TAC: 0000, and FFFE.   */
-typedef struct tai_s {
-  uint8_t  mcc_digit2:4;
-  uint8_t  mcc_digit1:4;
-  uint8_t  mnc_digit3:4;
-  uint8_t  mcc_digit3:4;
-  uint8_t  mnc_digit2:4;
-  uint8_t  mnc_digit1:4;
-  tac_t    tac;
-} tai_t;
-
-
 /* Checks Mobile Country Code equality */
 #define MCCS_ARE_EQUAL(n1, n2)  (((n1).mcc_digit1 == (n2).mcc_digit1) && \
                                  ((n1).mcc_digit2 == (n2).mcc_digit2) && \
@@ -76,12 +67,12 @@ typedef struct tai_s {
 
 
 /* Checks TAIs equality */
-#define TAIS_ARE_EQUAL(t1, t2)  ((PLMNS_ARE_EQUAL((t1),(t2))) && \
+#define TAIS_ARE_EQUAL(t1, t2)  ((PLMNS_ARE_EQUAL(((t1).plmn),((t2).plmn))) && \
                                  ((t1).tac == (t2).tac))
 #define TAC_FMT "0x%"PRIx16
 #define TAI_FMT PLMN_FMT"-"TAC_FMT
 #define TAI_ARG(tAi_PtR) \
-  PLMN_ARG((tAi_PtR)),\
+  PLMN_ARG(&(tAi_PtR)->plmn),\
   (tAi_PtR)->tac
 
 /* Checks TAC validity */

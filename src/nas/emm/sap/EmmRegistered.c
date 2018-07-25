@@ -99,7 +99,7 @@ EmmRegistered (
 {
   OAILOG_FUNC_IN (LOG_NAS_EMM);
   int                                     rc = RETURNerror;
-  emm_context_t                          *emm_ctx = evt->ctx;
+  emm_data_context_t                          *emm_ctx = evt->ctx;
 
   assert (emm_fsm_get_state (emm_ctx) == EMM_REGISTERED);
 
@@ -150,19 +150,19 @@ EmmRegistered (
     nas_delete_attach_procedure(emm_ctx);
     break;
 
-  case _EMMREG_ATTACH_ABORT:
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_REGISTERED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
-    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    break;
+//  case _EMMREG_ATTACH_ABORT:
+//    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_REGISTERED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
+//    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+//    break;
 
   case _EMMREG_DETACH_INIT:
     OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_REGISTERED - Primitive _EMMREG_DETACH_INIT is not valid\n");
     MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_INIT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     break;
 
-  case _EMMREG_DETACH_REQ:
-    MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_REQ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    rc = emm_fsm_set_state (evt->ue_id, emm_ctx, EMM_DEREGISTERED_INITIATED);
+  case _EMMREG_DETACH_REQ:  /**< We have to be in EmmDeregisterInitiated. */
+    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_REGISTERED - Primitive _EMMREG_DETACH_REQ is not valid\n");
+    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_REQ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     break;
 
   case _EMMREG_DETACH_FAILED:
@@ -171,8 +171,24 @@ EmmRegistered (
     break;
 
   case _EMMREG_DETACH_CNF:
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_REGISTERED - Primitive _EMMREG_DETACH_CNF is not valid\n");
-    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_CNF ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+    MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_DETACH_CNF ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+    rc = emm_fsm_set_state (evt->ue_id, evt->ctx, EMM_DEREGISTERED);
+
+    //if ((emm_ctx) && (evt->notify) && (evt->u.detach.proc) && (evt->u.detach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)) {
+    //  rc = (*evt->u.detach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)(emm_ctx);
+    //}
+    if (evt->free_proc) {
+      nas_delete_detach_procedure(emm_ctx);
+    }
+    /*
+     * Don't clear the EMM context here.
+     * todo: make it optional!
+     * Clear the ESM message, if exists.
+     */
+    bdestroy_wrapper(&emm_ctx->esm_msg);
+    // todo: temporarily also remove the EMM context
+    // Release emm and esm context
+    _clear_emm_ctxt(emm_ctx);
     break;
 
   case _EMMREG_TAU_REQ:
@@ -187,8 +203,8 @@ EmmRegistered (
         rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.fail_out)(emm_ctx, &evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc);
       }
 
-      if ((rc != RETURNerror) && (emm_ctx) && (evt->notify) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)) {
-        rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)(emm_ctx);
+      if ((rc != RETURNerror) && (emm_ctx) && (evt->notify) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.success_notif)) {
+        rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.success_notif)(emm_ctx);
       }
 
       if (evt->free_proc) {
@@ -209,8 +225,13 @@ EmmRegistered (
         rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)(emm_ctx);
       }
 
-      if (evt->free_proc) {
-        nas_delete_tau_procedure(emm_ctx);
+      /** Check if the emm context still exists. */
+      if(emm_data_context_get(&_emm_data, evt->ue_id)){
+        if (evt->free_proc) {
+          nas_delete_common_procedure(emm_ctx, &evt->u.common.common_proc);
+        }
+      }else{
+        /** No EMM context exist. Not freeing any procedures. */
       }
     }
     break;
@@ -255,6 +276,7 @@ EmmRegistered (
   case _EMMREG_LOWERLAYER_RELEASE:
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_LOWERLAYER_RELEASE ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     nas_delete_all_emm_procedures(emm_ctx);
+    nas_delete_all_esm_procedures(emm_ctx);
     rc = RETURNok;
     break;
 

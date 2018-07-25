@@ -50,6 +50,10 @@ Description Implements the API used by the NAS layer running in the MME
 /* Maximum number of UEs the MME may simultaneously support */
 #define MME_API_NB_UE_MAX       256
 
+typedef enum {
+  UE_UNREGISTERED,
+  UE_REGISTERED
+} mm_state_t;
 
 /* Features supported by the MME */
 typedef enum mme_api_feature_s {
@@ -67,11 +71,6 @@ typedef enum mme_api_ip_version_e {
   MME_API_IPV4V6_ADDR,
   MME_API_ADDR_MAX
 } mme_api_ip_version_t;
-
-typedef enum {
-  UE_UNREGISTERED = 0,
-  UE_REGISTERED,
-} mm_state_t;
 
 /*
  * EPS Mobility Management configuration data
@@ -140,16 +139,19 @@ mme_api_notify_imsi ( const mme_ue_s1ap_id_t id, const imsi64_t imsi64);
 
 int mme_api_notify_new_guti (const mme_ue_s1ap_id_t ueid, guti_t * const guti);
 
-int mme_api_notified_new_ue_s1ap_id_association (
-    const enb_s1ap_id_key_t  enb_ue_s1ap_id_key,
-    const uint32_t         enb_id,
-    const mme_ue_s1ap_id_t mme_ue_s1ap_id);
+int mme_api_registration_complete(const mme_ue_s1ap_id_t mme_ue_s1ap_id);
 
 int mme_api_new_guti(const imsi_t * const imsi,
                      const guti_t * const old_guti,
                      guti_t       * const guti,
                      const tai_t  * const originating_tai,
                      tai_list_t   * const tai_list);
+
+bool
+mme_api_get_pending_bearer_deactivation (mme_ue_s1ap_id_t mme_ue_s1ap_id);
+
+void
+mme_api_set_pending_bearer_deactivation (mme_ue_s1ap_id_t mme_ue_s1ap_id, bool pending_bearer_deactivation);
 
 int mme_api_subscribe(bstring *apn, mme_api_ip_version_t mme_pdn_index, bstring *pdn_addr,
                       int is_emergency, mme_api_qos_t *qos);

@@ -85,6 +85,8 @@ int emm_send_status(const emm_as_status_t *, emm_status_msg *);
 
 int emm_send_detach_accept(const emm_as_data_t *, detach_accept_msg *);
 
+int emm_send_detach_request (const emm_as_data_t * msg, detach_request_msg * emm_msg);
+
 int emm_send_attach_accept(const emm_as_establish_t *, attach_accept_msg *);
 int emm_send_attach_accept_dl_nas (const emm_as_data_t * msg, attach_accept_msg *);
 int emm_send_attach_reject(const emm_as_establish_t *, attach_reject_msg *);
@@ -94,8 +96,8 @@ int emm_send_tracking_area_update_reject(const emm_as_establish_t *msg,
 int emm_send_tracking_area_update_accept (const emm_as_establish_t * msg,
                                    tracking_area_update_accept_msg * emm_msg);
 
-int emm_send_tracking_area_update_accept_dl_nas (const emm_as_data_t * msg,
-                                   tracking_area_update_accept_msg * emm_msg);
+//int emm_send_tracking_area_update_accept_dl_nas (const emm_as_data_t * msg,
+//                                   tracking_area_update_accept_msg * emm_msg);
 
 int emm_send_service_reject(const emm_as_establish_t *msg,
                                    service_reject_msg *emm_msg);

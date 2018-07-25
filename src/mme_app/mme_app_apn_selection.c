@@ -49,7 +49,7 @@
 #include "mme_app_apn_selection.h"
 
 //------------------------------------------------------------------------------
-struct apn_configuration_s   * mme_app_select_apn(ue_mm_context_t * const ue_context, const_bstring const ue_selected_apn)
+struct apn_configuration_s   * mme_app_select_apn(ue_context_t * const ue_context, const_bstring const ue_selected_apn)
 {
 
   context_identifier_t          default_context_identifier = ue_context->apn_config_profile.context_identifier;
@@ -64,7 +64,7 @@ struct apn_configuration_s   * mme_app_select_apn(ue_mm_context_t * const ue_con
       if (ue_context->apn_config_profile.apn_configuration[index].context_identifier == default_context_identifier) {
         OAILOG_DEBUG (LOG_MME_APP, "Selected APN %s for UE " IMSI_64_FMT "\n",
             ue_context->apn_config_profile.apn_configuration[index].service_selection,
-            ue_context->emm_context._imsi64);
+            ue_context->imsi);
         return &ue_context->apn_config_profile.apn_configuration[index];
       }
     } else {
@@ -76,7 +76,7 @@ struct apn_configuration_s   * mme_app_select_apn(ue_mm_context_t * const ue_con
           strlen(ue_context->apn_config_profile.apn_configuration[index].service_selection)) == 1) {
           OAILOG_DEBUG (LOG_MME_APP, "Selected APN %s for UE " IMSI_64_FMT "\n",
               ue_context->apn_config_profile.apn_configuration[index].service_selection,
-              ue_context->emm_context._imsi64);
+              ue_context->imsi);
         return &ue_context->apn_config_profile.apn_configuration[index];
       }
     }
@@ -87,7 +87,7 @@ struct apn_configuration_s   * mme_app_select_apn(ue_mm_context_t * const ue_con
 
 
 //------------------------------------------------------------------------------
-struct apn_configuration_s *mme_app_get_apn_config(ue_mm_context_t * const ue_context, const context_identifier_t context_identifier)
+struct apn_configuration_s *mme_app_get_apn_config(ue_context_t * const ue_context, const context_identifier_t context_identifier)
 {
   int                           index;
 

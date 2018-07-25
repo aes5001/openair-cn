@@ -19,7 +19,6 @@
  *      contact@openairinterface.org
  */
 
-
 /*! \file s1ap_mme_handlers.h
   \brief
   \author Sebastien ROUX, Lionel Gauthier
@@ -29,8 +28,12 @@
 
 #ifndef FILE_S1AP_MME_HANDLERS_SEEN
 #define FILE_S1AP_MME_HANDLERS_SEEN
-
+#include "s1ap_ies_defs.h"
+#include "s1ap_mme.h"
+#include "intertask_interface.h"
 #define MAX_NUM_PARTIAL_S1_CONN_RESET 256
+
+
 
 /** \brief Handle decoded incoming messages from SCTP
  * \param assoc_id SCTP association ID
@@ -86,19 +89,60 @@ int s1ap_mme_generate_s1_setup_failure(
     const sctp_assoc_id_t assoc_id, const S1ap_Cause_PR cause_type, const long cause_value,
     const long time_to_wait);
 
+/*** HANDLING EXPIRED TIMERS. */
+void s1ap_mme_handle_ue_context_rel_comp_timer_expiry (void *ue_ref_p);
+
+void s1ap_mme_handle_mme_mobility_completion_timer_expiry (void *ue_ref_p);
+
 int s1ap_mme_handle_erab_setup_response (const sctp_assoc_id_t assoc_id,
     const sctp_stream_id_t stream, struct s1ap_message_s *message);
+
+int s1ap_mme_handle_erab_release_response (
+    const sctp_assoc_id_t assoc_id,
+    const sctp_stream_id_t stream,
+    struct s1ap_message_s *message);
+
+int s1ap_mme_handle_erab_release_indication (
+    const sctp_assoc_id_t assoc_id,
+    const sctp_stream_id_t stream,
+    struct s1ap_message_s *message);
 
 int s1ap_mme_handle_erab_setup_failure (const sctp_assoc_id_t assoc_id,
     const sctp_stream_id_t stream, struct s1ap_message_s *message);
 
-void s1ap_mme_handle_ue_context_rel_comp_timer_expiry (ue_description_t *ue_ref_p);
+int s1ap_handle_enb_initiated_reset_ack (const itti_s1ap_enb_initiated_reset_ack_t * const enb_reset_ack_p);
 
-int s1ap_mme_handle_error_ind_message (const sctp_assoc_id_t assoc_id, 
+int s1ap_mme_handle_error_ind_message (const sctp_assoc_id_t assoc_id,
                                        const sctp_stream_id_t stream, struct s1ap_message_s *message);
 
 int s1ap_mme_handle_enb_reset (const sctp_assoc_id_t assoc_id,
                                const sctp_stream_id_t stream, struct s1ap_message_s *message);
 
-int s1ap_handle_enb_initiated_reset_ack (const itti_s1ap_enb_initiated_reset_ack_t * const enb_reset_ack_p);
+/***************************** *
+ * HANDOVER MESSAGING.
+ * **************************  */
+int s1ap_mme_handle_path_switch_request(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message_p);
+
+int s1ap_mme_handle_handover_preparation(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message_p);
+
+int s1ap_mme_handle_handover_cancel(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message);
+
+int s1ap_mme_handle_handover_notification(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message);
+
+int
+s1ap_mme_handle_handover_resource_allocation_response(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message);
+
+int
+s1ap_mme_handle_handover_resource_allocation_failure(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message);
+
+int
+s1ap_mme_handle_enb_status_transfer(const sctp_assoc_id_t assoc_id, const sctp_stream_id_t stream,
+                                        struct s1ap_message_s *message);
+
 #endif /* FILE_S1AP_MME_HANDLERS_SEEN */

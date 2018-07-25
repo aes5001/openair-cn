@@ -1,30 +1,22 @@
 /*
- * Copyright (c) 2015, EURECOM (www.eurecom.fr)
- * All rights reserved.
+ * Licensed to the OpenAirInterface (OAI) Software Alliance under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The OpenAirInterface Software Alliance licenses this file to You under
+ * the Apache License, Version 2.0  (the "License"); you may not use this file
+ * except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * The views and conclusions contained in the software and documentation are those
- * of the authors and should not be interpreted as representing official policies,
- * either expressed or implied, of the FreeBSD Project.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *-------------------------------------------------------------------------------
+ * For more information about the OpenAirInterface (OAI) Software Alliance:
+ *      contact@openairinterface.org
  */
 
 /*! \file log.c
@@ -94,6 +86,8 @@ typedef enum {
   MAX_LOG_TCP_STATE
 } log_tcp_state_t;
 
+
+
 #define ANSI_CODE_MAX_LENGTH    32
 
 /*! \struct  oai_log_t
@@ -117,7 +111,6 @@ typedef struct oai_log_s {
   log_level_t                             log_level[MAX_LOG_PROTOS];                                   /*!< \brief Loglevel id of each client (protocol/layer) */
 
   log_message_number_t                    log_message_number;                                          /*!< \brief Counter of log message        */
-
   hash_table_ts_t                           *thread_context_htbl;                                         /*!< \brief Container for log_thread_ctxt_t */
 } oai_log_t;
 
@@ -156,8 +149,10 @@ void* log_task (__attribute__ ((unused)) void *args_p)
       case TERMINATE_MESSAGE:{
           timer_remove (timer_id, NULL);
           log_exit ();
+
           MessageDef   *terminate_message_p = itti_alloc_new_message (TASK_LOG, TERMINATE_MESSAGE);
           rc =  itti_send_msg_to_task (TASK_SHARED_TS_LOG, INSTANCE_DEFAULT, terminate_message_p);
+
           itti_exit_task ();
         }
         break;
@@ -255,16 +250,22 @@ void log_set_config(const log_config_t * const config)
       g_oai_log.log_level[LOG_NAS_ESM]  = config->nas_log_level;
     }
     if ((MAX_LOG_LEVEL > config->spgw_app_log_level) && (MIN_LOG_LEVEL <= config->spgw_app_log_level)) g_oai_log.log_level[LOG_SPGW_APP] = config->spgw_app_log_level;
+    if ((MAX_LOG_LEVEL > config->s10_log_level) && (MIN_LOG_LEVEL <= config->s10_log_level))           g_oai_log.log_level[LOG_S10]      = config->s10_log_level;
     if ((MAX_LOG_LEVEL > config->s11_log_level) && (MIN_LOG_LEVEL <= config->s11_log_level))           g_oai_log.log_level[LOG_S11]      = config->s11_log_level;
     if ((MAX_LOG_LEVEL > config->s6a_log_level) && (MIN_LOG_LEVEL <= config->s6a_log_level))           g_oai_log.log_level[LOG_S6A]      = config->s6a_log_level;
     if ((MAX_LOG_LEVEL > config->secu_log_level) && (MIN_LOG_LEVEL <= config->secu_log_level))         g_oai_log.log_level[LOG_SECU]     = config->secu_log_level;
     if ((MAX_LOG_LEVEL > config->util_log_level) && (MIN_LOG_LEVEL <= config->util_log_level))         g_oai_log.log_level[LOG_UTIL]     = config->util_log_level;
     if ((MAX_LOG_LEVEL > config->msc_log_level) && (MIN_LOG_LEVEL <= config->msc_log_level))           g_oai_log.log_level[LOG_MSC]      = config->msc_log_level;
+    if ((MAX_LOG_LEVEL > config->xml_log_level) && (MIN_LOG_LEVEL <= config->xml_log_level))           g_oai_log.log_level[LOG_XML]      = config->xml_log_level;
+    if ((MAX_LOG_LEVEL > config->mme_scenario_player_log_level) && (MIN_LOG_LEVEL <= config->mme_scenario_player_log_level))
+      g_oai_log.log_level[LOG_MME_SCENARIO_PLAYER]      = config->mme_scenario_player_log_level;
     if ((MAX_LOG_LEVEL > config->itti_log_level) && (MIN_LOG_LEVEL <= config->itti_log_level))         g_oai_log.log_level[LOG_ITTI]     = config->itti_log_level;
     if ((MAX_LOG_LEVEL > config->async_system_log_level) && (MIN_LOG_LEVEL <= config->async_system_log_level))
       g_oai_log.log_level[LOG_ASYNC_SYSTEM] = config->async_system_log_level;
 
+
     g_oai_log.is_output_fd_buffered = config->is_output_thread_safe;
+
     g_oai_log.is_ansi_codes = config->color;
 
     if (config->output) {
@@ -387,14 +388,16 @@ log_init (
   snprintf (&g_oai_log.log_proto2str[LOG_NAS_EMM][0], LOG_MAX_PROTO_NAME_LENGTH, "NAS-EMM");
   snprintf (&g_oai_log.log_proto2str[LOG_NAS_ESM][0], LOG_MAX_PROTO_NAME_LENGTH, "NAS-ESM");
   snprintf (&g_oai_log.log_proto2str[LOG_SPGW_APP][0], LOG_MAX_PROTO_NAME_LENGTH, "SPGW-APP");
+  snprintf (&g_oai_log.log_proto2str[LOG_S10][0], LOG_MAX_PROTO_NAME_LENGTH, "S10");
   snprintf (&g_oai_log.log_proto2str[LOG_S11][0], LOG_MAX_PROTO_NAME_LENGTH, "S11");
   snprintf (&g_oai_log.log_proto2str[LOG_S6A][0], LOG_MAX_PROTO_NAME_LENGTH, "S6A");
   snprintf (&g_oai_log.log_proto2str[LOG_SECU][0], LOG_MAX_PROTO_NAME_LENGTH, "SECU");
   snprintf (&g_oai_log.log_proto2str[LOG_UTIL][0], LOG_MAX_PROTO_NAME_LENGTH, "UTIL");
   snprintf (&g_oai_log.log_proto2str[LOG_CONFIG][0], LOG_MAX_PROTO_NAME_LENGTH, "CONFIG");
   snprintf (&g_oai_log.log_proto2str[LOG_MSC][0], LOG_MAX_PROTO_NAME_LENGTH, "MSC");
+  snprintf (&g_oai_log.log_proto2str[LOG_XML][0], LOG_MAX_PROTO_NAME_LENGTH, "XML");
+  snprintf (&g_oai_log.log_proto2str[LOG_MME_SCENARIO_PLAYER][0], LOG_MAX_PROTO_NAME_LENGTH, "MME-TEST");
   snprintf (&g_oai_log.log_proto2str[LOG_ITTI][0], LOG_MAX_PROTO_NAME_LENGTH, "ITTI");
-
   snprintf (&g_oai_log.log_proto2str[LOG_ASYNC_SYSTEM][0], LOG_MAX_PROTO_NAME_LENGTH, "CMD");
 
   snprintf (&g_oai_log.log_level2str[OAILOG_LEVEL_TRACE][0], LOG_LEVEL_NAME_MAX_LENGTH, "TRACE");
@@ -553,6 +556,7 @@ void log_stream_hex(
     log_message_start(thread_ctxt, log_levelP, protoP, &message, source_fileP, line_numP, "hex stream (%ld bytes):", sizeP);
     if (!message) return;
   }
+
   if ((streamP) && (message)) {
     for (octet_index = 0; octet_index < sizeP; octet_index++) {
       // do not call log_message_add(), too much overhead for sizeP*3chars
@@ -710,7 +714,6 @@ void log_message_start (
   if (! *messageP) {
     *messageP = get_new_log_queue_item(SH_TS_LOG_TXT);
   }
-
   if (*messageP) {
     struct timeval elapsed_time;
     (*messageP)->u_app_log.log.log_level = log_levelP;

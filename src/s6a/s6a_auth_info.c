@@ -19,16 +19,10 @@
  *      contact@openairinterface.org
  */
 
-/*! \file s6a_auth_info.c
-  \brief
-  \author Sebastien ROUX
-  \company Eurecom
-*/
 
 #include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include <pthread.h>
+
 
 #include "bstrlib.h"
 
@@ -36,13 +30,18 @@
 #include "log.h"
 #include "msc.h"
 #include "mme_config.h"
+
 #include "assertions.h"
 #include "conversions.h"
+
 #include "common_types.h"
 #include "common_defs.h"
+
+
 #include "intertask_interface.h"
 #include "s6a_defs.h"
 #include "s6a_messages.h"
+#include "msc.h"
 
 static
   int
@@ -135,6 +134,9 @@ s6a_parse_e_utran_vector (
     case AVP_CODE_KASME:
       CHECK_FCT (s6a_parse_kasme (hdr, vector->kasme));
       ret &= ~0x08;
+      break;
+
+    case AVP_CODE_ITEM_NUMBER:
       break;
 
     default:
@@ -351,7 +353,7 @@ s6a_generate_authentication_info_req (
     value.os.len = blength(host);
     CHECK_FCT (fd_msg_avp_setvalue (avp, &value));
     CHECK_FCT (fd_msg_avp_add (msg, MSG_BRW_LAST_CHILD, avp));
-    bdestroy_wrapper (&host);
+    bdestroy(host);
   }
   /*
    * Destination_Realm
@@ -417,9 +419,8 @@ s6a_generate_authentication_info_req (
      */
     if (air_p->re_synchronization) {
       CHECK_FCT (fd_msg_avp_new (s6a_fd_cnf.dataobj_s6a_re_synchronization_info, 0, &child_avp));
-      // TODO Fix after updating HSS
-      value.os.len = AUTS_LENGTH;
-      value.os.data = (air_p->resync_param + RAND_LENGTH_OCTETS);
+      value.os.len = RESYNC_PARAM_LENGTH;
+      value.os.data = air_p->auts;
       CHECK_FCT (fd_msg_avp_setvalue (child_avp, &value));
       CHECK_FCT (fd_msg_avp_add (avp, MSG_BRW_LAST_CHILD, child_avp));
     }

@@ -48,6 +48,6 @@ int sctp_itti_send_new_message_ind(
     const sctp_stream_id_t instreams,
     const sctp_stream_id_t outstreams);
 
-int sctp_itti_send_com_down_ind(const sctp_assoc_id_t assoc_id, bool reset);
+int sctp_itti_send_com_down_ind(const sctp_assoc_id_t assoc_id);
 
 #endif /* FILE_SCTP_ITTI_MESSAGING_SEEN */

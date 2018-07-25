@@ -47,9 +47,12 @@ nas_itti_erab_setup_req (
     const bitrate_t        gbr_dl,
     const bitrate_t        gbr_ul,
     bstring                nas_msg);
+int
+nas_itti_erab_release_req (const mme_ue_s1ap_id_t ue_id,
+    const ebi_t ebi,
+    bstring                nas_msg);
 
 void nas_itti_pdn_config_req(
-  int                     ptiP,
   unsigned int            ue_idP,
   const imsi_t           *const imsi_pP,
   esm_proc_data_t        *proc_data_pP,
@@ -59,9 +62,26 @@ void nas_itti_pdn_connectivity_req(
   int                     ptiP,
   const mme_ue_s1ap_id_t  ue_idP,
   const pdn_cid_t         pdn_cidP,
+  const ebi_t             default_ebi,
+  const imsi64_t          imsi,
   const imsi_t           *const imsi_pP,
   esm_proc_data_t        *proc_data_pP,
   esm_proc_pdn_request_t  request_typeP);
+
+void nas_itti_pdn_disconnect_req(
+  mme_ue_s1ap_id_t        ue_idP,
+  ebi_t                   default_ebi,
+  struct in_addr          saegw_s11_addr, /**< Put them into the UE context ? */
+  teid_t                  saegw_s11_teid,
+  bool                    noDelete,
+  esm_proc_data_t        *proc_data_pP);
+
+void nas_itti_ctx_req(
+  const uint32_t        ue_idP,
+  const guti_t        * const guti_p,
+  tai_t         * const new_taiP,
+  tai_t         * const last_visited_taiP,
+  bstring               request_msg);
 
 void nas_itti_auth_info_req(
   const mme_ue_s1ap_id_t ue_idP,
@@ -80,21 +100,29 @@ void nas_itti_establish_cnf(
   const mme_ue_s1ap_id_t ue_idP,
   const nas_error_code_t error_codeP,
   bstring                msgP,
+  const uint32_t         nas_count,
   const uint16_t         selected_encryption_algorithmP,
   const uint16_t         selected_integrity_algorithmP);
 
 void nas_itti_detach_req(
   const mme_ue_s1ap_id_t      ue_idP);
 
-void nas_itti_dedicated_eps_bearer_complete(
+void nas_itti_activate_bearer_cnf(
     const mme_ue_s1ap_id_t ue_idP,
-    const ebi_t ebiP);
+    const ebi_t            ebi);
 
-void nas_itti_dedicated_eps_bearer_reject(
+void nas_itti_activate_bearer_rej(
     const mme_ue_s1ap_id_t ue_idP,
-    const ebi_t ebiP);
+    const ebi_t            ebi);
+
+void nas_itti_dedicated_eps_bearer_deactivation_complete(
+    const mme_ue_s1ap_id_t ue_idP,
+    const ebi_t default_ebi,
+    const pdn_cid_t pid,
+    const ebi_t ded_ebi);
 
 void  s6a_auth_info_rsp_timer_expiry_handler (void *args);
 
+void  s10_context_req_timer_expiry_handler (void *args);
 
 #endif /* FILE_NAS_ITTI_MESSAGING_SEEN */

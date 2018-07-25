@@ -1,3 +1,23 @@
+/*
+ * Licensed to the OpenAirInterface (OAI) Software Alliance under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The OpenAirInterface Software Alliance licenses this file to You under
+ * the Apache License, Version 2.0  (the "License"); you may not use this file
+ * except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *-------------------------------------------------------------------------------
+ * For more information about the OpenAirInterface (OAI) Software Alliance:
+ *      contact@openairinterface.org
+ */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,6 +36,10 @@
 #include "gtpv1u.h"
 #include "gtpv1u_sgw_defs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern struct gtp_tunnel_ops gtp_tunnel_ops;
 
 static struct {
@@ -27,7 +51,7 @@ static struct {
 
 #define GTP_DEVNAME "gtp0"
 
-int libgtpnl_init(struct in_addr *ue_net, uint32_t mask, int mtu, int *fd0, int *fd1u)
+int libgtpnl_init(struct in_addr *ue_net, struct in_addr *ue_netmask, int mtu, int *fd0, int *fd1u)
 {
   // we don't need GTP v0, but interface with kernel requires 2 file descriptors
   *fd0 = socket(AF_INET, SOCK_DGRAM, 0);
@@ -125,7 +149,7 @@ int libgtpnl_reset(void)
   return rv;
 }
 
-int libgtpnl_add_tunnel(struct in_addr ue, struct in_addr enb, uint32_t i_tei, uint32_t o_tei)
+int libgtpnl_add_tunnel(struct in_addr ue, struct in_addr enb, uint32_t i_tei, uint32_t o_tei, imsi_t imsi)
 {
   struct gtp_tunnel *t;
   int ret;
@@ -151,7 +175,7 @@ int libgtpnl_add_tunnel(struct in_addr ue, struct in_addr enb, uint32_t i_tei, u
   return ret;
 }
 
-int libgtpnl_del_tunnel(uint32_t i_tei, uint32_t o_tei)
+int libgtpnl_del_tunnel(struct in_addr ue, uint32_t i_tei, uint32_t o_tei)
 {
   struct gtp_tunnel *t;
   int ret;
@@ -185,5 +209,11 @@ static const struct gtp_tunnel_ops libgtpnl_ops = {
 };
 
 const struct gtp_tunnel_ops *gtp_tunnel_ops_init(void) {
+  OAILOG_DEBUG (LOG_GTPV1U , "Initializing gtp_tunnel_ops_libgtpnl\n");
   return &libgtpnl_ops;
 }
+
+#ifdef __cplusplus
+}
+#endif
+

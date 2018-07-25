@@ -179,7 +179,7 @@ emm_fsm_initialize (
 int
 emm_fsm_set_state (
   const mme_ue_s1ap_id_t ue_id,
-  struct emm_context_s * const emm_context,
+  struct emm_data_context_s * const emm_context,
   const emm_fsm_state_t state)
 {
   OAILOG_FUNC_IN (LOG_NAS_EMM);
@@ -229,12 +229,12 @@ emm_fsm_set_state (
  **                                                                        **
  ***************************************************************************/
 emm_fsm_state_t
-emm_fsm_get_state (const struct emm_context_s * const emm_context)
+emm_fsm_get_state (const struct emm_data_context_s * const emm_context)
 {
   if (emm_context ) {
     AssertFatal((emm_context->_emm_fsm_state < EMM_STATE_MAX) && (emm_context->_emm_fsm_state > EMM_STATE_MIN),
         "ue_id " MME_UE_S1AP_ID_FMT " BAD EMM state %d",
-        PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id,
+        emm_context->ue_id,
         emm_context->_emm_fsm_state);
     return emm_context->_emm_fsm_state;
   }
@@ -243,7 +243,7 @@ emm_fsm_get_state (const struct emm_context_s * const emm_context)
 
 //------------------------------------------------------------------------------
 const char *
-emm_fsm_get_state_str (const struct emm_context_s * const emm_context)
+emm_fsm_get_state_str (const struct emm_data_context_s * const emm_context)
 {
   if (emm_context ) {
     emm_fsm_state_t state  = emm_fsm_get_state (emm_context);
@@ -274,7 +274,7 @@ int emm_fsm_process (struct emm_reg_s * const evt)
 
   OAILOG_FUNC_IN (LOG_NAS_EMM);
   primitive = evt->primitive;
-  emm_context_t                     *emm_ctx = (emm_context_t *) evt->ctx;
+  emm_data_context_t                     *emm_ctx = (emm_data_context_t *) evt->ctx;
 
   if (emm_ctx) {
     state = emm_fsm_get_state (emm_ctx);

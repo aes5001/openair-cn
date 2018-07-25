@@ -81,7 +81,7 @@ Description Defines functions executed at the ESM Service Access
  * --------------------------------------------------------------------------
  */
 
-esm_cause_t esm_recv_status(emm_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
+esm_cause_t esm_recv_status(emm_data_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
                     const esm_status_msg *msg);
 
 /*
@@ -93,33 +93,34 @@ esm_cause_t esm_recv_status(emm_context_t * emm_context, proc_tid_t pti, ebi_t e
  * Transaction related messages
  * ----------------------------
  */
-esm_cause_t esm_recv_pdn_connectivity_request(emm_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
-                                      const pdn_connectivity_request_msg *msg, ebi_t *new_ebi);
+esm_cause_t esm_recv_pdn_connectivity_request(emm_data_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
+                                      const pdn_connectivity_request_msg *msg, ebi_t *new_ebi, bool *is_pdn_connectivity,
+                                      pdn_context_t **pdn_context_pp);
 
-esm_cause_t esm_recv_pdn_disconnect_request(emm_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
+esm_cause_t esm_recv_pdn_disconnect_request(emm_data_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
                                     const pdn_disconnect_request_msg *msg,
                                     ebi_t *linked_ebi);
 
-esm_cause_t esm_recv_information_response (emm_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
+esm_cause_t esm_recv_information_response (emm_data_context_t * emm_context, proc_tid_t pti, ebi_t ebi,
                                     const esm_information_response_msg * msg);
 
 /*
  * Messages related to EPS bearer contexts
  * ---------------------------------------
  */
-esm_cause_t esm_recv_activate_default_eps_bearer_context_accept(emm_context_t * emm_context,
+esm_cause_t esm_recv_activate_default_eps_bearer_context_accept(emm_data_context_t * emm_context,
     proc_tid_t pti, ebi_t ebi, const activate_default_eps_bearer_context_accept_msg *msg);
 
-esm_cause_t esm_recv_activate_default_eps_bearer_context_reject(emm_context_t * emm_context,
+esm_cause_t esm_recv_activate_default_eps_bearer_context_reject(emm_data_context_t * emm_context,
     proc_tid_t pti, ebi_t ebi, const activate_default_eps_bearer_context_reject_msg *msg);
 
-esm_cause_t esm_recv_activate_dedicated_eps_bearer_context_accept(emm_context_t * emm_context,
+esm_cause_t esm_recv_activate_dedicated_eps_bearer_context_accept(emm_data_context_t * emm_context,
     proc_tid_t pti, ebi_t ebi, const activate_dedicated_eps_bearer_context_accept_msg *msg);
 
-esm_cause_t esm_recv_activate_dedicated_eps_bearer_context_reject(emm_context_t * emm_context,
+esm_cause_t esm_recv_activate_dedicated_eps_bearer_context_reject(emm_data_context_t * emm_context,
     proc_tid_t pti, ebi_t ebi, const activate_dedicated_eps_bearer_context_reject_msg *msg);
 
-esm_cause_t esm_recv_deactivate_eps_bearer_context_accept(emm_context_t * emm_context, proc_tid_t pti,
+esm_cause_t esm_recv_deactivate_eps_bearer_context_accept(emm_data_context_t * emm_context, proc_tid_t pti,
     ebi_t ebi, const deactivate_eps_bearer_context_accept_msg *msg);
 
 #endif /* __ESM_RECV_H__*/

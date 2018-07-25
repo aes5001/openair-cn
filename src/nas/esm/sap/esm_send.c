@@ -322,6 +322,12 @@ esm_send_activate_default_eps_bearer_context_request (
 
   if (pco) {
     msg->presencemask |= ACTIVATE_DEFAULT_EPS_BEARER_CONTEXT_REQUEST_PROTOCOL_CONFIGURATION_OPTIONS_PRESENT;
+    /**
+     * The PCOs actually received by the SAE-GW.
+     * todo: After handover, the received PCOs might have been changed (like DNS address), we need to check them and inform the UE.
+     * todo: We also need to be able to ask the SAE-GW for specific PCOs?
+     * In handover, any change in the ESM context information has to be forwarded to the UE --> MODIFY EPS BEARER CONTEXT REQUEST!! (probably not possible with TAU accept).
+     */
     copy_protocol_configuration_options(&msg->protocolconfigurationoptions, pco);
   }
 //#pragma message  "TEST LG FORCE APN-AMBR"
@@ -378,7 +384,6 @@ esm_send_activate_dedicated_eps_bearer_context_request (
   traffic_flow_template_t *tft,
   protocol_configuration_options_t *pco)
 {
-
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   /*
    * Mandatory - ESM message header
@@ -405,9 +410,9 @@ esm_send_activate_dedicated_eps_bearer_context_request (
   msg->presencemask = 0;
   if (pco) {
     memcpy(&msg->protocolconfigurationoptions, pco, sizeof(protocol_configuration_options_t));
-    msg->presencemask |= ACTIVATE_DEDICATED_EPS_BEARER_CONTEXT_REQUEST_PROTOCOL_CONFIGURATION_OPTIONS_IEI;
+    msg->presencemask |= ACTIVATE_DEDICATED_EPS_BEARER_CONTEXT_REQUEST_PROTOCOL_CONFIGURATION_OPTIONS_PRESENT;
   }
-  OAILOG_INFO (LOG_NAS_ESM, "ESM-SAP   - Send Activate Dedicated EPS Bearer Context " "Request message (pti=%d, ebi=%d)\n", msg->proceduretransactionidentity, msg->epsbeareridentity);
+  OAILOG_INFO (LOG_NAS_ESM, "ESM-SAP   - Send Activate Dedicated EPS Bearer Context " "Request message (pti=%d, ebi=%d). \n", msg->proceduretransactionidentity, msg->epsbeareridentity);
   OAILOG_FUNC_RETURN (LOG_NAS_ESM, RETURNok);
 }
 

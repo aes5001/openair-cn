@@ -82,11 +82,9 @@ void nas_proc_cleanup(void);
 
 
 int nas_proc_establish_ind(const mme_ue_s1ap_id_t ue_id,
-                            const bool is_mm_ctx_new,
                             const tai_t originating_tai,
                             const ecgi_t ecgi,
                             const as_cause_t as_cause,
-                            const s_tmsi_t s_tmsi,
                             STOLEN_REF bstring *msg);
 
 int nas_proc_dl_transfer_cnf(const mme_ue_s1ap_id_t ueid, const nas_error_code_t status, STOLEN_REF bstring *  nas_msg);
@@ -106,9 +104,15 @@ int nas_proc_auth_param_res (mme_ue_s1ap_id_t ue_id, uint8_t nb_vectors, eutran_
 int nas_proc_auth_param_fail(mme_ue_s1ap_id_t ue_id, nas_cause_t cause);
 int nas_proc_deregister_ue(uint32_t ue_id);
 int nas_proc_pdn_config_res (emm_cn_pdn_config_res_t * emm_cn_pdn_config_res);
+int nas_proc_pdn_config_fail (emm_cn_pdn_config_fail_t * emm_cn_pdn_config_fail);
 int nas_proc_pdn_connectivity_res(emm_cn_pdn_res_t *nas_pdn_connectivity_rsp);
 int nas_proc_pdn_connectivity_fail(emm_cn_pdn_fail_t *nas_pdn_connectivity_fail);
-int nas_proc_create_dedicated_bearer(emm_cn_activate_dedicated_bearer_req_t * emm_cn_activate);
+int nas_proc_pdn_disconnect_res (emm_cn_pdn_disconnect_res_t * emm_cn_pdn_disconnect_res);
+int nas_proc_activate_dedicated_bearer(emm_cn_activate_dedicated_bearer_req_t * emm_cn_activate);
+int nas_proc_deactivate_dedicated_bearer(emm_cn_deactivate_dedicated_bearer_req_t * emm_cn_deactivate);
 int nas_proc_signalling_connection_rel_ind (mme_ue_s1ap_id_t ue_id);
-int nas_proc_implicit_detach_ue_ind (mme_ue_s1ap_id_t ue_id);
+int nas_proc_implicit_detach_ue_ind (mme_ue_s1ap_id_t ue_id, uint8_t emm_cause, uint8_t detach_type);
+/** NAS context response. */
+int nas_proc_context_res (itti_nas_context_res_t *nas_context_res);
+int nas_proc_context_fail (mme_ue_s1ap_id_t ue_id, gtpv2c_cause_value_t cause);
 #endif /* FILE_NAS_PROC_SEEN*/

@@ -29,6 +29,7 @@
 #include <nettle/aes.h>
 #include <nettle/ctr.h>
 #include "bstrlib.h"
+
 #include "assertions.h"
 #include "conversions.h"
 #include "secu_defs.h"

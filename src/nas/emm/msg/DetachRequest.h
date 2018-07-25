@@ -27,15 +27,14 @@
 #include "DetachType.h"
 #include "NasKeySetIdentifier.h"
 #include "EpsMobileIdentity.h"
+#include "EmmCause.h"
 #include "3gpp_23.003.h"
 #include "3gpp_24.007.h"
 #include "3gpp_24.008.h"
 
 /* Minimum length macro. Formed by minimum length of each mandatory field */
 #define DETACH_REQUEST_MINIMUM_LENGTH ( \
-    DETACH_TYPE_MINIMUM_LENGTH + \
-    NAS_KEY_SET_IDENTIFIER_MINIMUM_LENGTH + \
-    EPS_MOBILE_IDENTITY_MINIMUM_LENGTH )
+    DETACH_TYPE_MINIMUM_LENGTH )
 
 /* Maximum length macro. Formed by maximum length of each field */
 #define DETACH_REQUEST_MAXIMUM_LENGTH ( \
@@ -43,6 +42,11 @@
     NAS_KEY_SET_IDENTIFIER_MAXIMUM_LENGTH + \
     EPS_MOBILE_IDENTITY_MAXIMUM_LENGTH )
 
+# define DETACH_REQUEST_EMM_CAUSE_PRESENT                    (1<<3)
+
+typedef enum detach_request_iei_tag {
+  DETACH_REQUEST_EMM_CAUSE_IEI                    = 0x53, /* 0x53 = 83 */
+} detach_request_iei;
 
 /*
  * Message name: Detach request
@@ -57,8 +61,10 @@ typedef struct detach_request_msg_tag {
   security_header_type_t       securityheadertype:4;
   message_type_t               messagetype;
   detach_type_t                   detachtype;
+  emm_cause_t                    emmCause;
   NasKeySetIdentifier          naskeysetidentifier;
   eps_mobile_identity_t        gutiorimsi;
+  uint32_t                     presencemask;
 } detach_request_msg;
 
 int decode_detach_request(detach_request_msg *detachrequest, uint8_t *buffer, uint32_t len);

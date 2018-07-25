@@ -37,7 +37,6 @@
 
 #include "oai_mme.h"
 
-
 #include <freeDiameter/freeDiameter-host.h>
 #include <freeDiameter/libfdcore.h>
 

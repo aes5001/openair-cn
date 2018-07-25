@@ -107,10 +107,45 @@ emm_proc_status_ind (
   int                                     rc = RETURNok;
 
   OAILOG_INFO (LOG_NAS_EMM, "EMM-PROC  - EMM status procedure requested (cause=%d)", emm_cause);
-  OAILOG_DEBUG (LOG_NAS_EMM, "EMM-PROC  - To be implemented");
+
   /*
-   * TODO
+   * Add the cause value to the specific procedure, if exists.
+   * When the procedure wakes up, will detach itself.
    */
+  emm_data_context_t * emm_context = emm_data_context_get(&_emm_data, ue_id);
+  if(!emm_context){
+    OAILOG_INFO (LOG_NAS_EMM, "EMM-PROC  - No EMM context was found for ueId " MME_UE_S1AP_ID_FMT ". \n", ue_id);
+    OAILOG_FUNC_RETURN (LOG_NAS_EMM, rc);
+  }
+  /** Check the cause. */
+  if(emm_cause == EMM_CAUSE_SUCCESS){
+    OAILOG_INFO (LOG_NAS_EMM, "EMM-PROC  - EMM Cause is success. Nothing else to do for ueId " MME_UE_S1AP_ID_FMT ". \n", ue_id);
+    OAILOG_FUNC_RETURN (LOG_NAS_EMM, rc);
+  }
+
+  emm_sap_t                 emm_sap = {0};
+  emm_sap.u.emm_reg.ue_id = ue_id;
+  emm_sap.u.emm_reg.ctx   = emm_context;
+
+  /** Set the cause to the specific procedure. */
+  if(is_nas_specific_procedure_attach_running(emm_context)){
+    OAILOG_WARNING(LOG_NAS_EMM, "EMM-PROC  - An attach procedure exists for ueId " MME_UE_S1AP_ID_FMT ". Aborting. \n", ue_id);
+    emm_sap.primitive = EMMREG_ATTACH_ABORT;
+    emm_sap.u.emm_reg.u.attach.proc   = get_nas_specific_procedure_attach(emm_context);
+    rc = emm_sap_send (&emm_sap);
+  }else if (is_nas_specific_procedure_tau_running(emm_context)){
+    OAILOG_WARNING(LOG_NAS_EMM, "EMM-PROC  - A TAU procedure exists for ueId " MME_UE_S1AP_ID_FMT ". Aborting. \n", ue_id);
+    emm_sap.primitive = EMMREG_TAU_ABORT;
+    emm_sap.u.emm_reg.u.tau.proc      = get_nas_specific_procedure_tau(emm_context);
+    rc = emm_sap_send (&emm_sap);
+  }else{
+    nas_emm_specific_proc_t * specific_proc = get_nas_specific_procedure(emm_context);
+    if(specific_proc){
+      OAILOG_WARNING(LOG_NAS_EMM, "EMM-PROC  - A specific procedure of exists of type %d for ueId " MME_UE_S1AP_ID_FMT ". Not aborting it. Ignoring the status message. \n", specific_proc->type, ue_id);
+    }else{
+      OAILOG_WARNING(LOG_NAS_EMM, "EMM-PROC  - NO specific procedure of exists for ueId " MME_UE_S1AP_ID_FMT ". Not aborting it. Ignoring the status message. \n", ue_id);
+    }
+  }
   OAILOG_FUNC_RETURN (LOG_NAS_EMM, rc);
 }
 
@@ -138,7 +173,7 @@ emm_proc_status (
   int                                     rc;
   emm_sap_t                               emm_sap = {0};
   emm_security_context_t                 *sctx = NULL;
-  struct emm_context_s              *ctx = NULL;
+  struct emm_data_context_s              *ctx = NULL;
 
   OAILOG_INFO (LOG_NAS_EMM, "EMM-PROC  - EMM status procedure requested\n");
   /*
@@ -149,12 +184,9 @@ emm_proc_status (
   emm_sap.u.emm_as.u.status.ue_id = ue_id;
   emm_sap.u.emm_as.u.status.guti = NULL;
 
-  ue_mm_context_t *ue_mm_context = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, ue_id);
-  if (ue_mm_context) {
-    ctx = &ue_mm_context->emm_context;
-    if (ctx) {
-      sctx = &ctx->_security;
-    }
+  ctx = emm_data_context_get(&_emm_data, ue_id);
+  if (ctx) {
+    sctx = &ctx->_security;
   }
 
   /*
@@ -163,7 +195,7 @@ emm_proc_status (
   emm_as_set_security_data (&emm_sap.u.emm_as.u.status.sctx, sctx, false, true);
   MSC_LOG_TX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "EMMAS_STATUS_IND  ue id " MME_UE_S1AP_ID_FMT " ", ue_id);
   rc = emm_sap_send (&emm_sap);
-  unlock_ue_contexts(ue_mm_context);
+//  unlock_ue_contexts(ue_context);
   OAILOG_FUNC_RETURN (LOG_NAS_EMM, rc);
 }
 

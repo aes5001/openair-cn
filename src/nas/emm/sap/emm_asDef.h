@@ -46,6 +46,7 @@ Description Defines the EMM primitives available at the EMMAS Service
 #include "TrackingAreaIdentityList.h"
 #include "3gpp_36.401.h"
 #include "3gpp_23.003.h"
+#include "emm_proc.h"
 
 /****************************************************************************/
 /*********************  G L O B A L    C O N S T A N T S  *******************/
@@ -68,6 +69,7 @@ typedef enum emm_as_primitive_u {
   _EMMAS_ERAB_SETUP_REQ, /* EMM->AS: ERAB setup request  */
   _EMMAS_ERAB_SETUP_CNF, /* AS->EMM  */
   _EMMAS_ERAB_SETUP_REJ, /* AS->EMM  */
+  _EMMAS_ERAB_RELEASE_REQ, /* EMM->AS: ERAB release request  */
   _EMMAS_DATA_REQ,      /* EMM->AS: Data transfer request     */
   _EMMAS_DATA_IND,      /* AS->EMM: Data transfer indication      */
   _EMMAS_PAGE_IND,      /* AS->EMM: Paging data indication        */
@@ -96,10 +98,10 @@ typedef struct emm_as_security_data_s {
  * ----------------------------
  */
 typedef struct emm_as_security_s {
+  int                    emm_cause;/* EMM failure cause code       */
   mme_ue_s1ap_id_t       ue_id;    /* UE lower layer identifier        */
   const guti_t          *guti;     /* GUTI temporary mobile identity   */
   emm_as_security_data_t sctx;     /* EPS NAS security context     */
-  int                    emm_cause;/* EMM failure cause code       */
   uint64_t               puid;     // linked to procedure UID
   /*
    * Identity request/response
@@ -139,6 +141,10 @@ typedef struct emm_as_security_s {
   uint8_t msg_type;    /* Type of NAS security message to transfer */
 } emm_as_security_t;
 
+typedef struct emm_as_base_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
+  mme_ue_s1ap_id_t       ue_id;                       /* UE lower layer identifier         */
+}emm_as_base_t;
 /*
  * EMMAS primitive for connection establishment
  * --------------------------------------------
@@ -152,42 +158,43 @@ typedef struct emm_as_EPS_identity_s {
 } emm_as_EPS_identity_t;
 
 typedef struct emm_as_establish_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
   mme_ue_s1ap_id_t       ue_id;                       /* UE lower layer identifier         */
-  uint64_t               puid;                        /* linked to procedure UID */
   emm_as_EPS_identity_t  eps_id;                      /* UE's EPS mobile identity      */
+  guti_t                *guti;                        /* TAU GUTI   */
+  const guti_t          *new_guti;                    /* New GUTI, if re-allocated         */
   emm_as_security_data_t sctx;                        /* EPS NAS security context      */
-  bool                   switch_off;                  /* true if the UE is switched off    */
-  bool                   is_initial;                  /* true if contained in initial message    */
-  bool                   is_mm_ctx_new;
-  uint8_t                type;                        /* Network attach/detach type        */
-  uint8_t                rrc_cause;                   /* Connection establishment cause    */
-  uint8_t                rrc_type;                    /* Associated call type          */
-  //const plmn_t          *plmn_id;                     /* Identifier of the selected PLMN   */
-  ksi_t                  ksi;                         /* NAS key set identifier        */
   uint8_t                encryption:4;                /* Ciphering algorithm           */
   uint8_t                integrity:4;                 /* Integrity protection algorithm    */
-  int                    emm_cause;                   /* EMM failure cause code        */
-  const guti_t          *new_guti;                    /* New GUTI, if re-allocated         */
+  const plmn_t          *plmn_id;                     /* Identifier of the selected PLMN   */
+  ecgi_t                 ecgi;                        /* E-UTRAN CGI This information element is used to globally identify a cell */
+  const tai_t           *tai;                         /* The first tracking area the UE is registered to */
+  tai_list_t             tai_list;                    /* Valid field if num tai > 0 */
+  uint8_t               *eps_network_feature_support; /* TAU Network feature support   */
+  bool                   switch_off;                  /* true if the UE is switched off    */
+  uint8_t                type;                        /* Network attach/detach type        */
+  uint8_t                nas_info;    /* Type of NAS information to transfer  */
+  bstring                nas_msg;     /* NAS message to be transfered     */
+  uint8_t                eps_update_result;           /* TAU EPS update result   */
+
+  uint64_t               puid;                        /* linked to procedure UID */
+  bool                   is_initial;                  /* true if contained in initial message    */
+  uint8_t                rrc_cause;                   /* Connection establishment cause    */
+  uint8_t                rrc_type;                    /* Associated call type          */
+  ksi_t                  ksi;                         /* NAS key set identifier        */
   int                    n_tacs;                      /* Number of consecutive tracking areas
                                                        * the UE is registered to       */
-  const tai_t           *tai;                         /* The first tracking area the UE is registered to */
   //tac_t                  tac;                         /* Code of the first tracking area the UE
   //                                                     * is registered to          */
-  ecgi_t                 ecgi;                        /* E-UTRAN CGI This information element is used to globally identify a cell */
 #define EMM_AS_NAS_INFO_ATTACH  0x01                  /* Attach request        */
 #define EMM_AS_NAS_INFO_DETACH  0x02                  /* Detach request        */
 #define EMM_AS_NAS_INFO_TAU     0x03                  /* Tracking Area Update request  */
 #define EMM_AS_NAS_INFO_SR      0x04                  /* Service Request       */
 #define EMM_AS_NAS_INFO_EXTSR   0x05                  /* Extended Service Request  */
+#define EMM_AS_NAS_INFO_DETACH_REQ  0x06  /* Detach Request     */
 #define EMM_AS_NAS_INFO_NONE    0xFF                  /* No Nas Message  */
-  uint8_t                nas_info;                    /* Type of initial NAS information to transfer   */
-  bstring                nas_msg;                     /* NAS message to be transfered within
-                                                       * initial NAS information message   */
 
-  uint8_t                eps_update_result;           /* TAU EPS update result   */
   uint32_t              *t3412;                       /* GPRS T3412 timer   */
-  guti_t                *guti;                        /* TAU GUTI   */
-  tai_list_t             tai_list;                    /* Valid field if num tai > 0 */
   uint16_t              *eps_bearer_context_status;   /* TAU EPS bearer context status   */
   void                  *location_area_identification;/* TAU Location area identification */
   //void                *ms_identity;                 /* TAU 8.2.26.7   MS identity This IE may be included to assign or unassign a new TMSI to a UE during a combined TA/LA update. */
@@ -196,7 +203,6 @@ typedef struct emm_as_establish_s {
   uint32_t              *t3423;                       /* TAU GPRS T3423 timer   */
   void                  *equivalent_plmns;            /* TAU Equivalent PLMNs   */
   void                  *emergency_number_list;       /* TAU Emergency number list   */
-  uint8_t               *eps_network_feature_support; /* TAU Network feature support   */
   uint8_t               *additional_update_result;    /* TAU Additional update result   */
   uint32_t              *t3412_extended;              /* TAU GPRS timer   */
 } emm_as_establish_t;
@@ -206,6 +212,7 @@ typedef struct emm_as_establish_s {
  * --------------------------------------
  */
 typedef struct emm_as_release_s {
+  int              emm_cause;
   mme_ue_s1ap_id_t ue_id;                   /* UE lower layer identifier          */
   const guti_t    *guti;                   /* GUTI temporary mobile identity     */
 #define EMM_AS_CAUSE_AUTHENTICATION 0x01   /* Authentication failure */
@@ -218,6 +225,7 @@ typedef struct emm_as_release_s {
  * ---------------------------------
  */
 typedef struct emm_as_data_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
   mme_ue_s1ap_id_t       ue_id;         /* UE lower layer identifier        */
   emm_as_EPS_identity_t  eps_id;        /* UE's EPS mobile identity         */
   const guti_t          *guti;          /* GUTI temporary mobile identity   */
@@ -232,25 +240,30 @@ typedef struct emm_as_data_s {
   uint8_t               *eps_network_feature_support; /* TAU Network feature support */
   bool                   switch_off;  /* true if the UE is switched off   */
   uint8_t                type;        /* Network detach type          */
+  uint8_t                nas_info;    /* Type of NAS information to transfer  */
+  bstring                nas_msg;     /* NAS message to be transfered     */
+  uint8_t                eps_update_result;           /* TAU EPS update result   */
+
 #define EMM_AS_DATA_DELIVERED_LOWER_LAYER_FAILURE                  0
 #define EMM_AS_DATA_DELIVERED_TRUE                                 1
 #define EMM_AS_DATA_DELIVERED_LOWER_LAYER_NON_DELIVERY_INDICATION_DUE_TO_HO  2
   uint8_t                delivered;   /* Data message delivery indicator  */
+  emm_proc_detach_type_t detach_type; /**< Set to true if reattach is required. */
 #define EMM_AS_NAS_DATA_ATTACH          0x01  /* Attach complete      */
-#define EMM_AS_NAS_DATA_DETACH          0x02  /* Detach request       */
+#define EMM_AS_NAS_DATA_DETACH_ACCEPT   0x02  /* Detach request       */
 #define EMM_AS_NAS_DATA_TAU             0x03  /* TAU    Accept        */
 #define EMM_AS_NAS_DATA_ATTACH_ACCEPT   0x04  /* Attach Accept        */
-  uint8_t                nas_info;    /* Type of NAS information to transfer  */
-  bstring                nas_msg;     /* NAS message to be transfered     */
+  /** MME initiated (implicit) Detach Request. */
+#define EMM_AS_NAS_DATA_DETACH_REQUEST        0x06  /* Detach Request     */
 } emm_as_data_t;
 
 /*
- * EMMAS primitive for paging
- * --------------------------
+ * EMMAS primitive for dedicated bearer establishment
+ * ----------------------------------------------------
  */
-typedef struct emm_as_page_s {} emm_as_page_t;
 
 typedef struct emm_as_activate_bearer_context_req_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
   mme_ue_s1ap_id_t       ue_id;       /* UE lower layer identifier        */
   ebi_t                  ebi;         /* EPS rab id                       */
   bitrate_t              mbr_dl;
@@ -261,15 +274,28 @@ typedef struct emm_as_activate_bearer_context_req_s {
   bstring                nas_msg;     /* NAS message to be transfered     */
 } emm_as_activate_bearer_context_req_t;
 
+typedef struct emm_as_deactivate_bearer_context_req_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
+  mme_ue_s1ap_id_t       ue_id;       /* UE lower layer identifier        */
+  ebi_t                  ebi;         /* EPS erab ids. Some eNodeBs like Nokia for does not accept list of bearers for deactivation. */
+  emm_as_security_data_t sctx;        /* EPS NAS security context         */
+  bstring                nas_msg;     /* NAS message to be transfered     */
+} emm_as_deactivate_bearer_context_req_t;
+
+typedef struct emm_as_erab_setup_rej_s {
+  mme_ue_s1ap_id_t       ue_id;
+  ebi_t                  ebi;
+} emm_as_erab_setup_rej_t;
+
 /*
  * EMMAS primitive for status indication
  * -------------------------------------
  */
 typedef struct emm_as_status_s {
+  int                    emm_cause;                   /* EMM failure cause code        */
   mme_ue_s1ap_id_t       ue_id;      /* UE lower layer identifier        */
   const guti_t          *guti;      /* GUTI temporary mobile identity   */
   emm_as_security_data_t sctx;      /* EPS NAS security context     */
-  int                    emm_cause; /* EMM failure cause code       */
 } emm_as_status_t;
 
 /*
@@ -277,6 +303,8 @@ typedef struct emm_as_status_s {
  * ------------------------------------
  */
 typedef struct emm_as_cell_info_s {
+  int                                emm_cause;                   /* EMM failure cause code        */
+  mme_ue_s1ap_id_t                   ue_id;      /* UE lower layer identifier        todo: define constant here?*/
   uint8_t                            found;    /* Indicates whether a suitable cell is found   */
 #define EMM_AS_PLMN_LIST_SIZE   6
   PLMN_LIST_T(EMM_AS_PLMN_LIST_SIZE) plmn_ids;
@@ -294,12 +322,14 @@ typedef struct emm_as_cell_info_s {
 typedef struct emm_as_s {
   emm_as_primitive_t primitive;
   union {
+    emm_as_base_t       base;                   /* EMM failure cause code        */
     emm_as_security_t   security;
     emm_as_establish_t  establish;
     emm_as_release_t    release;
     emm_as_data_t       data;
     emm_as_activate_bearer_context_req_t activate_bearer_context_req;
-    emm_as_page_t       page;
+    emm_as_deactivate_bearer_context_req_t deactivate_bearer_context_req;
+    emm_as_erab_setup_rej_t erab_setup_rej;
     emm_as_status_t     status;
     emm_as_cell_info_t  cell_info;
   } u;

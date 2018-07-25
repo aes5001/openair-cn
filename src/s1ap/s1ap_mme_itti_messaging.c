@@ -39,6 +39,7 @@
 #include "s1ap_common.h"
 #include "s1ap_mme_itti_messaging.h"
 
+
 //------------------------------------------------------------------------------
 int
 s1ap_mme_itti_send_sctp_request (
@@ -50,6 +51,7 @@ s1ap_mme_itti_send_sctp_request (
   MessageDef                             *message_p = NULL;
 
   message_p = itti_alloc_new_message (TASK_S1AP, SCTP_DATA_REQ);
+
   SCTP_DATA_REQ (message_p).payload = *payload;
   *payload = NULL;
   SCTP_DATA_REQ (message_p).assoc_id = assoc_id;
@@ -69,16 +71,16 @@ s1ap_mme_itti_nas_uplink_ind (
   MessageDef                             *message_p = NULL;
 
   message_p = itti_alloc_new_message (TASK_S1AP, NAS_UPLINK_DATA_IND);
-  NAS_UL_DATA_IND (message_p).ue_id          = ue_id;
-  NAS_UL_DATA_IND (message_p).nas_msg        = *payload;
+
+  NAS_UPLINK_DATA_IND (message_p).ue_id          = ue_id;
+  NAS_UPLINK_DATA_IND (message_p).nas_msg        = *payload;
   *payload = NULL;
-  NAS_UL_DATA_IND (message_p).tai            = *tai;
-  NAS_UL_DATA_IND (message_p).cgi            = *cgi;
+  NAS_UPLINK_DATA_IND (message_p).tai            = *tai;
+  NAS_UPLINK_DATA_IND (message_p).cgi            = *cgi;
 
   MSC_LOG_TX_MESSAGE (MSC_S1AP_MME, MSC_NAS_MME, NULL, 0, "0 NAS_UPLINK_DATA_IND ue_id " MME_UE_S1AP_ID_FMT " len %u",
-      NAS_UL_DATA_IND (message_p).ue_id, blength(NAS_UL_DATA_IND (message_p).nas_msg));
-  // yes, to TASK_MME_APP instead of NAS (threading issue with S1AP UE CTXT RELEASE)
-  return itti_send_msg_to_task (TASK_MME_APP, INSTANCE_DEFAULT, message_p);
+      NAS_UPLINK_DATA_IND (message_p).ue_id, blength(NAS_UPLINK_DATA_IND (message_p).nas_msg));
+  return itti_send_msg_to_task (TASK_NAS_MME, INSTANCE_DEFAULT, message_p);
 }
 
 //------------------------------------------------------------------------------
@@ -95,8 +97,10 @@ s1ap_mme_itti_nas_downlink_cnf (
     }
     // Drop this cnf message here since this is related to connection less S1AP message hence no need to send it to NAS module
     OAILOG_FUNC_RETURN (LOG_S1AP, RETURNok);
-  } 
+  }
+
   message_p = itti_alloc_new_message (TASK_S1AP, NAS_DOWNLINK_DATA_CNF);
+
   NAS_DL_DATA_CNF (message_p).ue_id = ue_id;
   if (is_success) {
     NAS_DL_DATA_CNF (message_p).err_code = AS_SUCCESS;
@@ -108,13 +112,12 @@ s1ap_mme_itti_nas_downlink_cnf (
       NAS_DL_DATA_CNF (message_p).ue_id, NAS_DL_DATA_CNF (message_p).err_code);
   return itti_send_msg_to_task (TASK_NAS_MME, INSTANCE_DEFAULT, message_p);
 }
-
 //------------------------------------------------------------------------------
-
 void s1ap_mme_itti_s1ap_initial_ue_message(
   const sctp_assoc_id_t   assoc_id,
   const uint32_t          enb_id,
   const enb_ue_s1ap_id_t  enb_ue_s1ap_id,
+  const mme_ue_s1ap_id_t  mme_ue_s1ap_id,
   const uint8_t * const   nas_msg,
   const size_t            nas_msg_length,
   const tai_t      const* tai,
@@ -123,9 +126,9 @@ void s1ap_mme_itti_s1ap_initial_ue_message(
   const s_tmsi_t   const* opt_s_tmsi,
   const csg_id_t   const* opt_csg_id,
   const gummei_t   const* opt_gummei,
-  const void       const* opt_cell_access_mode, // unused
-  const void       const* opt_cell_gw_transport_address, // unused
-  const void       const* opt_relay_node_indicator) // unused
+  const void       const* opt_cell_access_mode,  // unused
+  const void       const* opt_cell_gw_transport_address,  // unused
+  const void       const* opt_relay_node_indicator)  // unused
 {
   MessageDef  *message_p = NULL;
 
@@ -135,7 +138,7 @@ void s1ap_mme_itti_s1ap_initial_ue_message(
 
   S1AP_INITIAL_UE_MESSAGE(message_p).sctp_assoc_id          = assoc_id;
   S1AP_INITIAL_UE_MESSAGE(message_p).enb_ue_s1ap_id         = enb_ue_s1ap_id;
-  S1AP_INITIAL_UE_MESSAGE(message_p).enb_id                 = enb_id;
+  S1AP_INITIAL_UE_MESSAGE(message_p).mme_ue_s1ap_id         = mme_ue_s1ap_id;
 
   S1AP_INITIAL_UE_MESSAGE(message_p).nas                    = blk2bstr(nas_msg, nas_msg_length);
 
@@ -232,12 +235,12 @@ void s1ap_mme_itti_nas_non_delivery_ind(
   NAS_DL_DATA_REJ(message_p).nas_msg  = blk2bstr(nas_msg, nas_msg_length);
 
   MSC_LOG_TX_MESSAGE(
-  		MSC_S1AP_MME,
-  		MSC_NAS_MME,
-  		NULL,0,
-  		"0 NAS_DOWNLINK_DATA_REJ ue_id "MME_UE_S1AP_ID_FMT" len %u",
-  		ue_id,
-  		NAS_DL_DATA_REJ(message_p).nas_msg->slen);
+      MSC_S1AP_MME,
+      MSC_NAS_MME,
+      NULL,0,
+      "0 NAS_DOWNLINK_DATA_REJ ue_id "MME_UE_S1AP_ID_FMT" len %u",
+      ue_id,
+      NAS_DL_DATA_REJ(message_p).nas_msg->slen);
 
   // should be sent to MME_APP, but this one would forward it to NAS_MME, so send it directly to NAS_MME
   // but let's see

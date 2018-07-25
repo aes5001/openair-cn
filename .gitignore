@@ -1,8 +1,9 @@
-build/mme/build/
-build/mme/CMakeLists.txt
-build/spgw/build/
-build/spgw/CMakeLists.txt
+build/epc/build/
+build/epc/CMakeLists.txt
+build/epc/epc.conf.in.orig
 build/hss/build/
+build/spgw/build/
+build/mme/build/
 build/log/
 scripts/abort
 scripts/core

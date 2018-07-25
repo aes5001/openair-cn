@@ -50,6 +50,10 @@
 #include "common_defs.h"
 #include "sgw_config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef LIBCONFIG_LONG
 #  define libconfig_int long
 #else
@@ -88,6 +92,7 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
   char                                   *sgw_if_name_S11 = NULL;
   char                                   *S11 = NULL;
   libconfig_int                           sgw_udp_port_S1u_S12_S4_up = 2152;
+  libconfig_int                           sgw_udp_port_S11 = 2123;
   config_setting_t                       *subsetting = NULL;
   const char                             *astring = NULL;
   bstring                                 address = NULL;
@@ -124,9 +129,6 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
     config_pP->log_config.gtpv1u_log_level   = MAX_LOG_LEVEL;
     config_pP->log_config.gtpv2c_log_level   = MAX_LOG_LEVEL;
     config_pP->log_config.sctp_log_level     = MAX_LOG_LEVEL;
-    config_pP->log_config.s1ap_log_level     = MAX_LOG_LEVEL;
-    config_pP->log_config.nas_log_level      = MAX_LOG_LEVEL;
-    config_pP->log_config.mme_app_log_level  = MAX_LOG_LEVEL;
     config_pP->log_config.spgw_app_log_level = MAX_LOG_LEVEL;
     config_pP->log_config.s11_log_level      = MAX_LOG_LEVEL;
     config_pP->log_config.s6a_log_level      = MAX_LOG_LEVEL;
@@ -234,6 +236,7 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
         OAILOG_INFO (LOG_SPGW_APP, "Parsing configuration file found S5_S8_up: %s/%d on %s\n",
                        inet_ntoa (in_addr_var), config_pP->ipv4.netmask_S5_S8_up, bdata(config_pP->ipv4.if_name_S5_S8_up));
 
+        bdestroy_wrapper (&cidr);
         config_pP->ipv4.if_name_S11 = bfromcstr (sgw_if_name_S11);
         cidr = bfromcstr (S11);
         list = bsplit (cidr, '/');
@@ -246,9 +249,16 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
         in_addr_var.s_addr = config_pP->ipv4.S11.s_addr;
         OAILOG_INFO (LOG_SPGW_APP, "Parsing configuration file found S11: %s/%d on %s\n",
             inet_ntoa (in_addr_var), config_pP->ipv4.netmask_S11, bdata(config_pP->ipv4.if_name_S11));
+        bdestroy_wrapper (&cidr);
+      }
+      if (config_setting_lookup_int (subsetting, SGW_CONFIG_STRING_SGW_UDP_PORT_FOR_S11, &sgw_udp_port_S11)
+        ) {
+        config_pP->udp_port_S11 = sgw_udp_port_S11;
+      } else {
+        config_pP->udp_port_S11 = sgw_udp_port_S11;
       }
 
-      if (config_setting_lookup_int (subsetting, SGW_CONFIG_STRING_SGW_PORT_FOR_S1U_S12_S4_UP, &sgw_udp_port_S1u_S12_S4_up)
+      if (config_setting_lookup_int (subsetting, SGW_CONFIG_STRING_SGW_UDP_PORT_FOR_S1U_S12_S4_UP, &sgw_udp_port_S1u_S12_S4_up)
         ) {
         config_pP->udp_port_S1u_S12_S4_up = sgw_udp_port_S1u_S12_S4_up;
       } else {
@@ -258,7 +268,6 @@ int sgw_config_parse_file (sgw_config_t * config_pP)
   }
 
   config_destroy (&cfg);
-  OAILOG_SET_CONFIG(&config_pP->log_config);
   return RETURNok;
 }
 
@@ -280,6 +289,7 @@ void sgw_config_display (sgw_config_t * config_p)
   OAILOG_INFO (LOG_SPGW_APP, "- S11:\n");
   OAILOG_INFO (LOG_SPGW_APP, "    S11 iface ............: %s\n", bdata(config_p->ipv4.if_name_S11));
   OAILOG_INFO (LOG_SPGW_APP, "    S11 ip ...............: %s/%u\n", inet_ntoa (config_p->ipv4.S11), config_p->ipv4.netmask_S11);
+  OAILOG_INFO (LOG_SPGW_APP, "    S11 port .............: %u\n", config_p->udp_port_S11);
   OAILOG_INFO (LOG_SPGW_APP, "- ITTI:\n");
   OAILOG_INFO (LOG_SPGW_APP, "    queue size .......: %u (bytes)\n", config_p->itti_config.queue_size);
   OAILOG_INFO (LOG_SPGW_APP, "    log file .........: %s\n", bdata(config_p->itti_config.log_file));
@@ -296,3 +306,7 @@ void sgw_config_display (sgw_config_t * config_p)
   OAILOG_INFO (LOG_SPGW_APP, "    MSC log level........: %s (MeSsage Chart)\n", OAILOG_LEVEL_INT2STR(config_p->log_config.msc_log_level));
   OAILOG_INFO (LOG_SPGW_APP, "    ITTI log level.......: %s (InTer-Task Interface)\n", OAILOG_LEVEL_INT2STR(config_p->log_config.itti_log_level));
 }
+
+#ifdef __cplusplus
+}
+#endif

@@ -155,6 +155,7 @@ typedef enum nas_cause_s {
 typedef enum nas_error_code_s {
   AS_SUCCESS = 1, /* Success code, transaction is going on    */
   AS_TERMINATED_NAS,  /* Transaction terminated by NAS        */
+  AS_TERMINATED_NAS_LIGHT,  /* Transaction terminated by NAS        */
   AS_TERMINATED_AS,   /* Transaction terminated by AS         */
   AS_NON_DELIVERED_DUE_HO,      /* Failure code                 */
   AS_FAILURE      /* Failure code, stand also for lower layer failure AS_LOWER_LAYER_FAILURE */
@@ -510,8 +511,10 @@ typedef struct rab_establish_cnf_s {
  * to specific radio access bearer at the network side.
  */
 typedef struct rab_release_req_s {
+  mme_ue_s1ap_id_t ue_id;     /* UE lower layer identifier        */
   s_tmsi_t    s_tmsi;      /* UE identity                      */
   as_rab_id_t rab_id;      /* Radio access bearer identity     */
+  bstring     nas_msg; /* NAS message to transfer     */
 } rab_release_req_t;
 
 /*

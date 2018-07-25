@@ -29,22 +29,25 @@
 #ifndef FILE_NAS_PROCEDURES_SEEN
 #define FILE_NAS_PROCEDURES_SEEN
 
-struct emm_context_s;
+#include "3gpp_29.274.h"
+
+struct emm_data_context_s;
 struct nas_base_proc_s;
 struct nas_emm_proc_s;
 
-typedef int (*success_cb_t)(struct emm_context_s*);
-typedef int (*failure_cb_t)(struct emm_context_s*);
-typedef int (*proc_abort_t)(struct emm_context_s*, struct nas_base_proc_s*);
+typedef int (*success_cb_t)(struct emm_data_context_s*);
+typedef int (*failure_cb_t)(struct emm_data_context_s*);
 
-typedef int (*pdu_in_resp_t)(struct emm_context_s*, void *arg); // can be RESPONSE, COMPLETE, ACCEPT
-typedef int (*pdu_in_rej_t)(struct emm_context_s*, void *arg);  // REJECT.
-typedef int (*pdu_out_rej_t)(struct emm_context_s*, struct nas_base_proc_s *);  // REJECT.
+typedef int (*proc_abort_t)(struct emm_data_context_s*, struct nas_base_proc_s*);
+
+typedef int (*pdu_in_resp_t)(struct emm_data_context_s*, void *arg); // can be RESPONSE, COMPLETE, ACCEPT
+typedef int (*pdu_in_rej_t)(struct emm_data_context_s*, void *arg);  // REJECT.
+typedef int (*pdu_out_rej_t)(struct emm_data_context_s*, struct nas_base_proc_s *);  // REJECT.
 typedef void (*time_out_t)(void *arg);
 
-typedef int (*sdu_out_delivered_t)(struct emm_context_s*, struct nas_emm_proc_s*);
-typedef int (*sdu_out_not_delivered_t)(struct emm_context_s*, struct nas_emm_proc_s*);
-typedef int (*sdu_out_not_delivered_ho_t)(struct emm_context_s*, struct nas_emm_proc_s*);
+typedef int (*sdu_out_delivered_t)(struct emm_data_context_s*, struct nas_emm_proc_s*);
+typedef int (*sdu_out_not_delivered_t)(struct emm_data_context_s*, struct nas_emm_proc_s*);
+typedef int (*sdu_out_not_delivered_ho_t)(struct emm_data_context_s*, struct nas_emm_proc_s*);
 
 
 typedef enum {
@@ -103,10 +106,16 @@ typedef enum {
   EMM_SPEC_PROC_TYPE_TAU,
 } emm_specific_proc_type_t;
 
+typedef int (*retry_cb_t)(struct nas_emm_specific_proc_s *);
+
 // EMM Specific procedures
 typedef struct nas_emm_specific_proc_s {
   nas_emm_proc_t               emm_proc;
   emm_specific_proc_type_t     type;
+  struct nas_timer_s           retry_timer;   // EMM message retransmission timer
+  retry_cb_t                   retry_cb;
+  mme_ue_s1ap_id_t               old_ue_id;        /* OLD identifier used for retry methods                                */
+  bool                         smc_performed;
 } nas_emm_specific_proc_t;
 
 struct emm_attach_request_ies_s;
@@ -129,7 +138,10 @@ typedef struct nas_emm_attach_proc_s {
 struct emm_detach_request_ies_s;
 
 typedef struct nas_emm_detach_proc_s {
-  nas_emm_specific_proc_t             emm_spec_proc;
+  nas_emm_specific_proc_t          emm_spec_proc;
+  mme_ue_s1ap_id_t                 ue_id;
+  int                              detch_accept_sent;
+
   struct emm_detach_request_ies_s *ies;
 } nas_emm_detach_proc_t;
 
@@ -138,11 +150,16 @@ struct emm_tau_request_ies_s;
 typedef struct nas_emm_tau_proc_s {
   nas_emm_specific_proc_t          emm_spec_proc;
   struct nas_timer_s               T3450;   // EMM message retransmission timer
+
 #define TAU_COUNTER_MAX  5
+  int                              tau_accept_sent;
+  bool                             tau_reject_sent;
+  bool                             tau_complete_received;
   unsigned int                     retransmission_count; /* Retransmission counter   */
   bstring                          esm_msg_out; // ESM message to be sent within the Attach Accept message
   struct emm_tau_request_ies_s    *ies;
   mme_ue_s1ap_id_t                 ue_id;
+  ksi_t                            ksi;
   int                              emm_cause;
 } nas_emm_tau_proc_t;
 
@@ -173,7 +190,7 @@ typedef struct nas_emm_ident_proc_s {
 #define IDENTIFICATION_COUNTER_MAX  5
   unsigned int                retransmission_count;
   mme_ue_s1ap_id_t            ue_id;
-  bool                        is_cause_is_attach; //  could also be done by seeking parent procedure
+//  bool                        is_cause_is_attach; //  could also be done by seeking parent procedure
   identity_type2_t            identity_type;
 } nas_emm_ident_proc_t;
 
@@ -186,7 +203,7 @@ typedef struct nas_emm_auth_proc_s {
   unsigned int                sync_fail_count;     /* counter of successive AUTHENTICATION FAILURE messages from the UE with EMM cause #21 "synch failure" */
   unsigned int                mac_fail_count;
   mme_ue_s1ap_id_t            ue_id;
-  bool                        is_cause_is_attach; //  could also be done by seeking parent procedure
+//  bool                        is_cause_is_attach; //  could also be done by seeking parent procedure
   ksi_t                       ksi;
   uint8_t                     rand[AUTH_RAND_SIZE]; /* Random challenge number  */
   uint8_t                     autn[AUTH_AUTN_SIZE]; /* Authentication token     */
@@ -253,7 +270,7 @@ typedef struct nas_sr_proc_s {
 ////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   ESM_PROC_NONE = 0,
-  ESM_PROC_EPS_BEARER_CONTEXT,
+//  ESM_PROC_EPS_BEARER_CONTEXT,
   ESM_PROC_TRANSACTION
 } esm_proc_type_t;
 
@@ -262,18 +279,13 @@ typedef struct nas_esm_proc_s {
   esm_proc_type_t             type;
 } nas_esm_proc_t;
 
-typedef enum {
-  ESM_BEARER_CTX_PROC_NONE = 0,
-  ESM_PROC_DEFAULT_EPS_BEARER_CTXT_ACTIVATION,
-  ESM_PROC_DEDICATED_EPS_BEARER_CTXT_ACTIVATION,
-  ESM_PROC_EPS_BEARER_CTXT_MODIFICATION,
-  ESM_PROC_EPS_BEARER_CTXT_DEACTIVATION
-} esm_bearer_ctx_proc_type_t;
-
-typedef struct nas_esm_bearer_ctx_proc_s {
-  nas_esm_proc_t              esm_proc;
-  esm_bearer_ctx_proc_type_t  type;
-} nas_esm_bearer_ctx_proc_t;
+//typedef enum {
+//  ESM_BEARER_CTX_PROC_NONE = 0,
+//  ESM_PROC_DEFAULT_EPS_BEARER_CTXT_ACTIVATION,
+//  ESM_PROC_DEDICATED_EPS_BEARER_CTXT_ACTIVATION,
+//  ESM_PROC_EPS_BEARER_CTXT_MODIFICATION,
+//  ESM_PROC_EPS_BEARER_CTXT_DEACTIVATION
+//} esm_bearer_ctx_proc_type_t;
 
 typedef enum {
   ESM_TRANSACTION_PROC_NONE = 0,
@@ -288,12 +300,46 @@ typedef struct nas_esm_transaction_proc_s {
   esm_transaction_proc_type_t  type;
 } nas_esm_transaction_proc_t;
 
+typedef struct nas_esm_transaction_procedures_s {
+  nas_esm_transaction_proc_t                          *proc;
+  LIST_ENTRY(nas_esm_transaction_procedures_s)         entries;
+} nas_esm_transaction_procedures_t;
+
+///*
+// *
+// */
+//
+//typedef struct nas_esm_bearer_ctx_proc_s {
+//  nas_esm_proc_t               esm_proc;
+//  esm_bearer_ctx_proc_type_t   type;
+//  /** Pending Bearer Contexts. */
+//  LIST_HEAD(nas_transaction_procedures_head_s, bearer_context_s)  pending_bearers;
+//} nas_esm_bearer_ctx_proc_t;
+//
+//
+//typedef struct nas_esm_bearer_context_procedure_s {
+//  nas_esm_bearer_ctx_proc_t                           *proc;
+//  LIST_ENTRY(nas_esm_bearer_context_procedure_s)       entries;
+//} nas_esm_bearer_context_procedure_t;
+//
+///*
+// *
+// */
+
+typedef struct esm_procedures_s {
+  /** UE/PTI triggered ESM procedure. */
+  LIST_HEAD(nas_esm_transaction_procedures_head_s, nas_esm_transaction_procedures_s)  esm_transaction_procs;
+//  /** CN Triggered ESM procedure. */
+//  LIST_HEAD(nas_esm_bearer_context_procedures_head_s, nas_esm_bearer_context_procedure_s)  esm_bearer_context_procs;
+} esm_procedures_t;
+
 ////////////////////////////////////////////////////////////////////////////////
 // CN procedures
 ////////////////////////////////////////////////////////////////////////////////
 typedef enum {
   CN_PROC_NONE = 0,
-  CN_PROC_AUTH_INFO,
+  CN_PROC_AUTH_INFO,  /**< S6a Authentication Information Request. */
+  CN_PROC_CTX_REQ,  /**< S10 Context Request. */
 } cn_proc_type_t;
 
 
@@ -310,10 +356,44 @@ typedef struct nas_auth_info_proc_s {
   uint8_t                     nb_vectors;
   eutran_vector_t            *vector[MAX_EPS_AUTH_VECTORS];
   int                         nas_cause;
+  /*
+   * CN level timers.
+   * todo: are they defined in the specification?
+   */
   struct nas_timer_s          timer_s6a;
+  struct nas_timer_s          timer_s10;
   mme_ue_s1ap_id_t            ue_id;
   bool                        resync; // Indicates whether the authentication information is requested due to sync failure
 } nas_auth_info_proc_t;
+
+typedef struct nas_s10_context_s{
+  uint64_t                    imsi;
+  imsi_t                      _imsi;
+  imei_t                      _imei;
+  mm_context_eps_t              *mm_eps_ctx;
+  /** Information to update in the ESM layer. */
+  int                         n_active_ebrs;     /* Total number of active EPS bearer contexts   */
+  int                         n_active_pdns;     /* Number of active PDN connections     */
+  int                         n_pdns;
+}nas_s10_context_t;
+
+typedef struct nas_ctx_req_proc_s {
+  nas_cn_proc_t               cn_proc;
+  success_cb_t                success_notif;
+  failure_cb_t                failure_notif;
+//  bool                        request_sent;
+
+  /** From the ITTI message, we copy the stuff into here. */
+  nas_s10_context_t           nas_s10_context;
+  /** Need to set it for multi-APN cases of Idle Mode TAU. */
+  mme_ue_eps_pdn_connections_t  *pdn_connections;
+  uint8_t                     next_processed_pdn_connection;
+  int                         nas_cause;
+  fteid_t                     remote_mme_teid;
+  struct nas_timer_s          timer_s10; // todo: necessary?
+  mme_ue_s1ap_id_t            ue_id;
+  bool                        resync; // Indicates whether the authentication information is requested due to sync failure
+} nas_ctx_req_proc_t;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Mix them (kind of class hierarchy--)
@@ -335,6 +415,7 @@ typedef union {
   nas_esm_proc_t            esm_proc;
   nas_cn_proc_t             cn_proc;
   nas_auth_info_proc_t        auth_info;
+  nas_ctx_req_proc_t       ctx_req;
 } nas_proc_t;
 
 typedef struct nas_emm_common_procedure_s {
@@ -366,52 +447,73 @@ typedef struct emm_procedures_s {
   nas_proc_mess_sign_t nas_proc_mess_sign[MAX_NAS_PROC_MESS_SIGN];
 } emm_procedures_t;
 
-bool is_nas_common_procedure_guti_realloc_running(const struct emm_context_s * const ctxt);
-bool is_nas_common_procedure_authentication_running(const struct emm_context_s * const ctxt);
-bool is_nas_common_procedure_smc_running(const struct emm_context_s * const ctxt);
-bool is_nas_common_procedure_identification_running(const struct emm_context_s * const ctxt);
+bool is_nas_common_procedure_guti_realloc_running(const struct emm_data_context_s * const ctxt);
+bool is_nas_common_procedure_authentication_running(const struct emm_data_context_s * const ctxt);
+bool is_nas_common_procedure_smc_running(const struct emm_data_context_s * const ctxt);
+bool is_nas_common_procedure_identification_running(const struct emm_data_context_s * const ctxt);
 
-nas_emm_guti_proc_t  *get_nas_common_procedure_guti_realloc(const struct emm_context_s * const ctxt);
-nas_emm_ident_proc_t  *get_nas_common_procedure_identification(const struct emm_context_s * const ctxt);
-nas_emm_smc_proc_t   *get_nas_common_procedure_smc(const struct emm_context_s * const ctxt);
-nas_emm_auth_proc_t *get_nas_common_procedure_authentication(const struct emm_context_s * const ctxt);
+nas_emm_guti_proc_t  *get_nas_common_procedure_guti_realloc(const struct emm_data_context_s * const ctxt);
+nas_emm_ident_proc_t  *get_nas_common_procedure_identification(const struct emm_data_context_s * const ctxt);
+nas_emm_smc_proc_t   *get_nas_common_procedure_smc(const struct emm_data_context_s * const ctxt);
+nas_emm_auth_proc_t *get_nas_common_procedure_authentication(const struct emm_data_context_s * const ctxt);
 
-nas_auth_info_proc_t *get_nas_cn_procedure_auth_info(const struct emm_context_s * const ctxt);
+nas_auth_info_proc_t *get_nas_cn_procedure_auth_info(const struct emm_data_context_s * const ctxt);
 
-nas_sr_proc_t *get_nas_con_mngt_procedure_service_request(const struct emm_context_s * const ctxt);
+nas_ctx_req_proc_t *get_nas_cn_procedure_ctx_req(const struct emm_data_context_s * const ctxt);
 
-bool is_nas_specific_procedure_attach_running(const struct emm_context_s * const ctxt);
-bool is_nas_specific_procedure_detach_running(const struct emm_context_s * const ctxt);
-bool is_nas_specific_procedure_tau_running(const struct emm_context_s * const ctxt);
+nas_sr_proc_t *get_nas_con_mngt_procedure_service_request(const struct emm_data_context_s * const ctxt);
 
-nas_emm_attach_proc_t *get_nas_specific_procedure_attach(const struct emm_context_s * const ctxt);
-nas_emm_detach_proc_t *get_nas_specific_procedure_detach(const struct emm_context_s * const ctxt);
-nas_emm_tau_proc_t    *get_nas_specific_procedure_tau(const struct emm_context_s * const ctxt);
+bool is_nas_specific_procedure_attach_running(const struct emm_data_context_s * const ctxt);
+bool is_nas_specific_procedure_detach_running(const struct emm_data_context_s * const ctxt);
+bool is_nas_specific_procedure_tau_running(const struct emm_data_context_s * const ctxt);
+
+nas_emm_specific_proc_t *get_nas_specific_procedure(const struct emm_data_context_s * const ctxt);
+
+nas_emm_attach_proc_t *get_nas_specific_procedure_attach(const struct emm_data_context_s * const ctxt);
+nas_emm_detach_proc_t *get_nas_specific_procedure_detach(const struct emm_data_context_s * const ctxt);
+nas_emm_tau_proc_t    *get_nas_specific_procedure_tau(const struct emm_data_context_s * const ctxt);
 
 bool is_nas_attach_accept_sent(const nas_emm_attach_proc_t * const attach_proc);
 bool is_nas_attach_reject_sent(const nas_emm_attach_proc_t * const attach_proc);
 bool is_nas_attach_complete_received(const nas_emm_attach_proc_t * const attach_proc);
 
+bool is_nas_tau_accept_sent(const nas_emm_tau_proc_t * const tau_proc);
+bool is_nas_tau_reject_sent(const nas_emm_tau_proc_t * const tau_proc);
+bool is_nas_tau_complete_received(const nas_emm_tau_proc_t * const tau_proc);
+
 int nas_unlink_procedures(nas_base_proc_t * const parent_proc, nas_base_proc_t * const child_proc);
 
-void nas_delete_all_emm_procedures(struct emm_context_s * const emm_context);
-void nas_delete_common_procedure(struct emm_context_s * const emm_context, nas_emm_common_proc_t **  proc);
-void nas_delete_attach_procedure(struct emm_context_s * const emm_context);
-void nas_delete_tau_procedure(struct emm_context_s *emm_context);
-void nas_delete_detach_procedure(struct emm_context_s *emm_context);
+void nas_delete_all_emm_procedures(struct emm_data_context_s * const emm_context);
+void nas_delete_common_procedure(struct emm_data_context_s * const emm_context, nas_emm_common_proc_t **  proc);
+void nas_delete_attach_procedure(struct emm_data_context_s * const emm_context);
+void nas_delete_tau_procedure(struct emm_data_context_s *emm_context);
+void nas_delete_detach_procedure(struct emm_data_context_s *emm_context);
 
-void nas_delete_cn_procedure(struct emm_context_s *emm_context, nas_cn_proc_t * cn_proc);
+void nas_delete_cn_procedure(struct emm_data_context_s *emm_context, nas_cn_proc_t * cn_proc);
 
-nas_emm_attach_proc_t *nas_new_attach_procedure(struct emm_context_s * const emm_context);
-nas_emm_tau_proc_t *nas_new_tau_procedure(struct emm_context_s * const emm_context);
-nas_sr_proc_t* nas_new_service_request_procedure(struct emm_context_s * const emm_context);
-nas_emm_ident_proc_t *nas_new_identification_procedure(struct emm_context_s * const emm_context);
-nas_emm_auth_proc_t *nas_new_authentication_procedure(struct emm_context_s * const emm_context);
-nas_emm_smc_proc_t *nas_new_smc_procedure(struct emm_context_s * const emm_context);
-nas_auth_info_proc_t *nas_new_cn_auth_info_procedure(struct emm_context_s * const emm_context);
+nas_emm_attach_proc_t *nas_new_attach_procedure(struct emm_data_context_s * const emm_context);
+nas_emm_tau_proc_t *nas_new_tau_procedure(struct emm_data_context_s * const emm_context);
+nas_emm_detach_proc_t *nas_new_detach_procedure(struct emm_data_context_s * const emm_context);
+
+nas_sr_proc_t* nas_new_service_request_procedure(struct emm_data_context_s * const emm_context);
+nas_emm_ident_proc_t *nas_new_identification_procedure(struct emm_data_context_s * const emm_context);
+nas_emm_auth_proc_t *nas_new_authentication_procedure(struct emm_data_context_s * const emm_context);
+nas_emm_smc_proc_t *nas_new_smc_procedure(struct emm_data_context_s * const emm_context);
+nas_auth_info_proc_t *nas_new_cn_auth_info_procedure(struct emm_data_context_s * const emm_context);
+/** New CN context request procedure. */
+nas_ctx_req_proc_t *nas_new_cn_ctx_req_procedure(struct emm_data_context_s * const emm_context);
+
 
 void nas_digest_msg(const unsigned char * const msg, const size_t msg_len, char * const digest, /*INOUT*/ size_t * const digest_length);
 void nas_emm_procedure_register_emm_message(mme_ue_s1ap_id_t ue_id, const uint64_t puid, bstring nas_msg);
-nas_emm_proc_t * nas_emm_find_procedure_by_msg_digest(struct emm_context_s * const emm_context, const char * const digest, const size_t digest_bytes, const size_t msg_size);
+nas_emm_proc_t * nas_emm_find_procedure_by_msg_digest(struct emm_data_context_s * const emm_context, const char * const digest, const size_t digest_bytes, const size_t msg_size);
+
+///** New ESM Bearer Context procedure. */
+//nas_esm_bearer_ctx_proc_t *nas_new_esm_bearer_context_procedure(struct emm_data_context_s * const emm_context);
+//nas_esm_bearer_context_procedure_t  *get_esm_bearer_context_procedure(const struct emm_data_context_s * const ctxt, esm_bearer_ctx_proc_type_t esm_bc_proc_type); /**< Only one procedure can exist at a time. */
+nas_esm_transaction_proc_t *get_esm_transaction_procedure(const struct emm_data_context_s * const ctxt, esm_transaction_proc_type_t esm_trx_proc_type); /**< Only one procedure can exist at a time. */
+void nas_delete_all_esm_procedures(struct emm_data_context_s * const emm_context);
+void _nas_delete_esm_transaction_procedures(struct emm_data_context_s *emm_context, nas_esm_transaction_proc_t * trx_proc);
+//void _nas_delete_esm_bearer_context_procedures(struct emm_data_context_s *emm_context, nas_esm_bearer_ctx_proc_t * bc_proc);
 
 #endif

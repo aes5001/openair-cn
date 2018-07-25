@@ -61,7 +61,7 @@ extern                                  "C" {
   NW_IN nw_gtpv2c_stack_handle_t hGtpcStackHandle,
   NW_IN uint8_t msgType,
   NW_IN nw_rc_t                             (*ieReadCallback) (uint8_t ieType,
-                                                             uint8_t ieLength,
+                                                             uint16_t ieLength,
                                                              uint8_t ieInstance,
                                                              uint8_t * ieValue,
                                                              void *ieReadCallbackArg),
@@ -102,7 +102,7 @@ extern                                  "C" {
   nw_rc_t                                   nwGtpv2cMsgParserUpdateIeReadCallback (
   NW_IN nw_gtpv2c_msg_parser_t * thiz,
   NW_IN nw_rc_t                             (*ieReadCallback) (uint8_t ieType,
-                                                             uint8_t ieLength,
+                                                             uint16_t ieLength,
                                                              uint8_t ieInstance,
                                                              uint8_t * ieValue,
                                                              void *ieReadCallbackArg)) {
@@ -129,7 +129,7 @@ extern                                  "C" {
     nwGtpv2cMsgParserAddIe (NW_IN nw_gtpv2c_msg_parser_t * thiz,
                             NW_IN uint8_t ieType,
                             NW_IN uint8_t ieInstance,
-                            NW_IN uint8_t iePresence, NW_IN nw_rc_t (*ieReadCallback) (uint8_t ieType, uint8_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *ieReadCallbackArg), NW_IN void *ieReadCallbackArg) {
+                            NW_IN uint8_t iePresence, NW_IN nw_rc_t (*ieReadCallback) (uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *ieReadCallbackArg), NW_IN void *ieReadCallbackArg) {
     NW_ASSERT (thiz);
 
     if (thiz->ieParseInfo[ieType][ieInstance].iePresence == 0) {
@@ -152,7 +152,7 @@ extern                                  "C" {
     nwGtpv2cMsgParserUpdateIe (NW_IN nw_gtpv2c_msg_parser_t * thiz,
                                NW_IN uint8_t ieType,
                                NW_IN uint8_t ieInstance,
-                               NW_IN uint8_t iePresence, NW_IN nw_rc_t (*ieReadCallback) (uint8_t ieType, uint8_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *ieReadCallbackArg), NW_IN void *ieReadCallbackArg) {
+                               NW_IN uint8_t iePresence, NW_IN nw_rc_t (*ieReadCallback) (uint8_t ieType, uint16_t ieLength, uint8_t ieInstance, uint8_t * ieValue, void *ieReadCallbackArg), NW_IN void *ieReadCallbackArg) {
     NW_ASSERT (thiz);
 
     if (thiz->ieParseInfo[ieType][ieInstance].iePresence) {
@@ -210,8 +210,12 @@ extern                                  "C" {
           rc = thiz->ieParseInfo[pIe->t][pIe->i].ieReadCallback (pIe->t, ieLength, pIe->i, pIeStart + 4, thiz->ieParseInfo[pIe->t][pIe->i].ieReadCallbackArg);
 
           if (NW_OK == rc) {
-            if (thiz->ieParseInfo[pIe->t][pIe->i].iePresence == NW_GTPV2C_IE_PRESENCE_MANDATORY)
-              mandatoryIeCount++;
+            if (thiz->ieParseInfo[pIe->t][pIe->i].iePresence == NW_GTPV2C_IE_PRESENCE_MANDATORY){
+              if(!thiz->ieParseInfo[pIe->t][pIe->i].firstInstanceOccurred){
+                mandatoryIeCount++;
+                thiz->ieParseInfo[pIe->t][pIe->i].firstInstanceOccurred = true;
+              }
+            }
           } else {
             OAILOG_ERROR (LOG_GTPV2C, "Error while parsing IE %u with instance %u and length %u!\n", pIe->t, pIe->i, ieLength);
             break;
@@ -222,8 +226,12 @@ extern                                  "C" {
             rc = thiz->ieReadCallback (pIe->t, ieLength, pIe->i, pIeStart + 4, thiz->ieReadCallbackArg);
 
             if (NW_OK == rc) {
-              if (thiz->ieParseInfo[pIe->t][pIe->i].iePresence == NW_GTPV2C_IE_PRESENCE_MANDATORY)
-                mandatoryIeCount++;
+              if (thiz->ieParseInfo[pIe->t][pIe->i].iePresence == NW_GTPV2C_IE_PRESENCE_MANDATORY){
+                if(!thiz->ieParseInfo[pIe->t][pIe->i].firstInstanceOccurred){
+                  mandatoryIeCount++;
+                  thiz->ieParseInfo[pIe->t][pIe->i].firstInstanceOccurred = true;
+                }
+              }
             } else {
               OAILOG_ERROR (LOG_GTPV2C, "Error while parsing IE %u of length %u!\n", pIe->t, ieLength);
               break;

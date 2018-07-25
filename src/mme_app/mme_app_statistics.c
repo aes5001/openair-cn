@@ -19,6 +19,11 @@
  *      contact@openairinterface.org
  */
 
+/*! \file mme_app_statistics.c
+  \brief
+  \author Sebastien ROUX
+  \company Eurecom
+*/
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -31,6 +36,8 @@
 #include "mme_app_ue_context.h"
 #include "mme_app_defs.h"
 #include "mme_app_statistics.h"
+
+
 
 int mme_app_statistics_display (
   void)
@@ -48,9 +55,9 @@ int mme_app_statistics_display (
   OAILOG_DEBUG (LOG_MME_APP, "S1-U Bearers   | %10u      |     %10u              |    %10u               |\n\n",mme_app_desc.nb_s1u_bearers,
                                           mme_app_desc.nb_s1u_bearers_established_since_last_stat,mme_app_desc.nb_s1u_bearers_released_since_last_stat);
   OAILOG_DEBUG (LOG_MME_APP, "======================================= STATISTICS ============================================\n\n");
-  
+
   mme_stats_write_lock (&mme_app_desc);
-  
+
   // resetting stats for next display
   mme_app_desc.nb_enb_connected_since_last_stat = 0;
   mme_app_desc.nb_enb_released_since_last_stat  = 0;
@@ -62,7 +69,7 @@ int mme_app_statistics_display (
   mme_app_desc.nb_eps_bearers_released_since_last_stat = 0;
   mme_app_desc.nb_ue_attached_since_last_stat = 0;
   mme_app_desc.nb_ue_detached_since_last_stat = 0;
-  
+
   mme_stats_unlock(&mme_app_desc);
 
   return 0;
@@ -70,7 +77,7 @@ int mme_app_statistics_display (
 
 /*********************************** Utility Functions to update Statistics**************************************/
 
-// Number of Connected eNBs 
+// Number of Connected eNBs
 void update_mme_app_stats_connected_enb_add(void)
 {
   mme_stats_write_lock (&mme_app_desc);
@@ -88,6 +95,8 @@ void update_mme_app_stats_connected_enb_sub(void)
   mme_stats_unlock(&mme_app_desc);
   return;
 }
+
+
 
 /*****************************************************/
 // Number of Connected UEs
@@ -110,7 +119,7 @@ void update_mme_app_stats_connected_ue_sub(void)
 }
 
 /*****************************************************/
-// Number of S1U Bearers 
+// Number of S1U Bearers
 void update_mme_app_stats_s1u_bearer_add(void)
 {
   mme_stats_write_lock (&mme_app_desc);
@@ -130,7 +139,7 @@ void update_mme_app_stats_s1u_bearer_sub(void)
 }
 
 /*****************************************************/
-// Number of Default EPS Bearers 
+// Number of Default EPS Bearers
 void update_mme_app_stats_default_bearer_add(void)
 {
   mme_stats_write_lock (&mme_app_desc);
@@ -150,7 +159,7 @@ void update_mme_app_stats_default_bearer_sub(void)
 }
 
 /*****************************************************/
-// Number of Attached UEs 
+// Number of Attached UEs
 void update_mme_app_stats_attached_ue_add(void)
 {
   mme_stats_write_lock (&mme_app_desc);
@@ -169,3 +178,4 @@ void update_mme_app_stats_attached_ue_sub(void)
   return;
 }
 /*****************************************************/
+

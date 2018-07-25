@@ -68,6 +68,7 @@
 #include "esm_ebr_context.h"
 #include "emm_sap.h"
 #include "mme_config.h"
+#include "mme_app_defs.h"
 
 /****************************************************************************/
 /****************  E X T E R N A L    D E F I N I T I O N S  ****************/
@@ -94,7 +95,7 @@ static void _default_eps_bearer_activate_t3485_handler (void *);
 #define DEFAULT_EPS_BEARER_ACTIVATE_COUNTER_MAX 5
 
 static int _default_eps_bearer_activate (
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   ebi_t ebi,
   STOLEN_REF bstring *msg);
 
@@ -129,27 +130,49 @@ static int _default_eps_bearer_activate (
  ***************************************************************************/
 int
 esm_proc_default_eps_bearer_context (
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   const proc_tid_t   pti,
-  pdn_cid_t pid,
+  pdn_context_t *pdn_context,
+  const bstring apn,
   ebi_t *ebi,
   const qci_t  qci,
   esm_cause_t *esm_cause)
 {
   OAILOG_FUNC_IN (LOG_NAS_ESM);
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
   OAILOG_INFO (LOG_NAS_ESM,
-      "ESM-PROC  - Default EPS bearer context activation (ue_id=" MME_UE_S1AP_ID_FMT ", pid=%d,  QCI %u)\n",ue_id, pid, qci);
+      "ESM-PROC  - Default EPS bearer context activation (ue_id=" MME_UE_S1AP_ID_FMT ", context_identifier=%d,  QCI %u)\n",ue_id, pdn_context->context_identifier, qci);
+
+  ue_context_t                        *ue_context = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, emm_context->ue_id);
+
+
+  /** Checking for valid fields inside the search comparision function. */
+//  pdn_context_t pdn_context_key = {.apn_subscribed = apn, .default_ebi = 0, .context_identifier = pdn_context->context_identifier};
+//  pdn_context_t *pdn_context = RB_FIND(PdnContexts, &ue_context->pdn_contexts, &pdn_context_key);
+
+
+//  uintptr_t pdn_context_ptr =  (uintptr_t) RB_FIND(PdnContexts, &ue_context->pdn_contexts, &pdn_context_key);
+
+//  pdn_context_t * pdn_context = mme_app_get_pdn_context(ue_context, pdn_context->context_identifier, 0, apn);
+  if(!pdn_context){
+    OAILOG_ERROR(LOG_NAS_EMM, "EMMCN-SAP  - " "No PDN context was found for UE " MME_UE_S1AP_ID_FMT" for cid %d to assign bearer with ebi %d.\n", ue_context->mme_ue_s1ap_id, pdn_context->context_identifier, *ebi);
+    OAILOG_FUNC_RETURN (LOG_NAS_ESM, RETURNerror);
+  }
   /*
    * Assign new EPS bearer context
    */
-  *ebi = esm_ebr_assign (emm_context, ESM_EBI_UNASSIGNED);
+  *ebi = esm_ebr_assign (emm_context, ESM_EBI_UNASSIGNED, pdn_context);
 
   if (*ebi != ESM_EBI_UNASSIGNED) {
+    /** Set the default EBI of the as the ebi. */
+    pdn_context->default_ebi = *ebi;
     /*
-     * Create default EPS bearer context
+     * Create default EPS bearer context.
+     * Null as Bearer Level QoS
      */
-    *ebi = esm_ebr_context_create (emm_context, pti, pid, *ebi, IS_DEFAULT_BEARER_YES, qci, 0, 0 , 0, 0, (traffic_flow_template_t *)NULL, (protocol_configuration_options_t*)NULL);
+    // todo: S1U SGW set before?
+    bearer_qos_t bearer_qos = {.qci = qci};
+    *ebi = esm_ebr_context_create (emm_context, pti, pdn_context, *ebi, NULL, IS_DEFAULT_BEARER_YES, &bearer_qos, (traffic_flow_template_t *)NULL, (protocol_configuration_options_t*)NULL);
 
     if (*ebi == ESM_EBI_UNASSIGNED) {
       /*
@@ -200,7 +223,7 @@ esm_proc_default_eps_bearer_context (
 int
 esm_proc_default_eps_bearer_context_request (
   bool is_standalone,
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   ebi_t ebi,
   STOLEN_REF bstring *msg,
   bool ue_triggered)
@@ -208,7 +231,7 @@ esm_proc_default_eps_bearer_context_request (
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   int                                     rc = RETURNok;
 
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
 
   if (is_standalone) {
     /*
@@ -264,13 +287,13 @@ esm_proc_default_eps_bearer_context_request (
  ***************************************************************************/
 int
 esm_proc_default_eps_bearer_context_accept (
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   ebi_t ebi,
   esm_cause_t *esm_cause)
 {
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   int                                     rc;
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
 
   OAILOG_INFO (LOG_NAS_ESM, "ESM-PROC  - Default EPS bearer context activation " "accepted by the UE (ue_id=" MME_UE_S1AP_ID_FMT ", ebi=%d)\n",
       ue_id, ebi);
@@ -321,13 +344,13 @@ esm_proc_default_eps_bearer_context_accept (
  ***************************************************************************/
 int
 esm_proc_default_eps_bearer_context_reject (
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   ebi_t ebi,
   esm_cause_t *esm_cause)
 {
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   int                                     rc;
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
 
   OAILOG_WARNING (LOG_NAS_ESM, "ESM-PROC  - Default EPS bearer context activation " "not accepted by the UE (ue_id=" MME_UE_S1AP_ID_FMT ", ebi=%d)\n",
       ue_id, ebi);
@@ -343,7 +366,7 @@ esm_proc_default_eps_bearer_context_reject (
     /*
      * Release the default EPS bearer context and enter state INACTIVE
      */
-    rc = esm_proc_eps_bearer_context_deactivate (emm_context, true, ebi, &pid, &bid, NULL);
+    rc = esm_proc_eps_bearer_context_deactivate (emm_context, true, ebi, pid, NULL);
 
     if (rc != RETURNok) {
       /*
@@ -380,11 +403,11 @@ esm_proc_default_eps_bearer_context_reject (
  **      Others:    None                                       **
  **                                                                        **
  ***************************************************************************/
-int esm_proc_default_eps_bearer_context_failure (emm_context_t * emm_context, pdn_cid_t * const pid)
+int esm_proc_default_eps_bearer_context_failure (emm_data_context_t * emm_context, pdn_cid_t * const pid, ebi_t *ebi)
 {
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   int                                     rc = RETURNerror;
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
 
   *pid = MAX_APN_PER_UE;
 
@@ -398,15 +421,15 @@ int esm_proc_default_eps_bearer_context_failure (emm_context_t * emm_context, pd
    * Get the EPS bearer identity of the EPS bearer context which is still
    * * * * pending in the active pending state
    */
-  ebi_t                                     ebi = esm_ebr_get_pending_ebi (emm_context, ESM_EBR_ACTIVE_PENDING);
+  *ebi = esm_ebr_get_pending_ebi (emm_context, ESM_EBR_ACTIVE_PENDING);
 
-  if (ebi != ESM_EBI_UNASSIGNED) {
+  if (*ebi != ESM_EBI_UNASSIGNED) {
     int                                  bid = BEARERS_PER_UE;
 
     /*
      * Release the default EPS bearer context and enter state INACTIVE
      */
-    rc = esm_proc_eps_bearer_context_deactivate (emm_context, true, ebi, pid, &bid, NULL);
+    rc = esm_proc_eps_bearer_context_deactivate (emm_context, true, *ebi, *pid, NULL);
   }
 
   OAILOG_FUNC_RETURN (LOG_NAS_ESM, rc);
@@ -481,7 +504,7 @@ static void _default_eps_bearer_activate_t3485_handler (void *args)
       /*
        * Release the default EPS bearer context and enter state INACTIVE
        */
-      rc = esm_proc_eps_bearer_context_deactivate (esm_ebr_timer_data->ctx, true, esm_ebr_timer_data->ebi, &pid, &bidx, NULL);
+      rc = esm_proc_eps_bearer_context_deactivate (esm_ebr_timer_data->ctx, true, esm_ebr_timer_data->ebi, pid, NULL);
 
       if (rc != RETURNerror) {
         /*
@@ -524,36 +547,51 @@ static void _default_eps_bearer_activate_t3485_handler (void *args)
  ***************************************************************************/
 static int
 _default_eps_bearer_activate (
-  emm_context_t * emm_context,
+  emm_data_context_t * emm_context,
   ebi_t ebi,
   STOLEN_REF bstring *msg)
 {
   OAILOG_FUNC_IN (LOG_NAS_ESM);
   emm_sap_t                               emm_sap = {0};
   int                                     rc;
-  mme_ue_s1ap_id_t                        ue_id = PARENT_STRUCT(emm_context, struct ue_mm_context_s, emm_context)->mme_ue_s1ap_id;
+  mme_ue_s1ap_id_t                        ue_id = emm_context->ue_id;
+  ue_context_t                           *ue_context  = mme_ue_context_exists_mme_ue_s1ap_id (&mme_app_desc.mme_ue_contexts, emm_context->ue_id);
+  bearer_context_t                       *bearer_context = NULL;
 
   /*
-   * Notify EMM that an activate default EPS bearer context request message
-   * has to be sent to the UE
+   * Notify EMM that an activate dedicated EPS bearer context request
+   * message has to be sent to the UE
    */
-  MSC_LOG_TX_MESSAGE (MSC_NAS_ESM_MME, MSC_NAS_EMM_MME, NULL, 0, "0 EMMESM_UNITDATA_REQ ue id " MME_UE_S1AP_ID_FMT " ", ue_id);
-  emm_esm_data_t                         *emm_esm = &emm_sap.u.emm_esm.u.data;
 
-  emm_sap.primitive = EMMESM_UNITDATA_REQ;
+  mme_app_get_session_bearer_context_from_all(ue_context, ebi, &bearer_context);
+
+  MSC_LOG_TX_MESSAGE (MSC_NAS_ESM_MME, MSC_NAS_EMM_MME, NULL, 0, "0 EMMESM_ACTIVATE_BEARER_REQ ue id " MME_UE_S1AP_ID_FMT " ", ue_id);
+  emm_esm_activate_bearer_req_t                         *emm_esm_activate = &emm_sap.u.emm_esm.u.activate_bearer;
+
+  emm_sap.primitive       = EMMESM_ACTIVATE_BEARER_REQ;
   emm_sap.u.emm_esm.ue_id = ue_id;
-  emm_sap.u.emm_esm.ctx = emm_context;
-  emm_esm->msg = *msg;
-  msg = NULL;
+  emm_sap.u.emm_esm.ctx   = emm_context;
+  emm_esm_activate->msg            = *msg;
+  emm_esm_activate->ebi            = ebi;
+
+  emm_esm_activate->mbr_dl         = bearer_context->esm_ebr_context.mbr_dl;
+  emm_esm_activate->mbr_ul         = bearer_context->esm_ebr_context.mbr_ul;
+  emm_esm_activate->gbr_dl         = bearer_context->esm_ebr_context.gbr_dl;
+  emm_esm_activate->gbr_ul         = bearer_context->esm_ebr_context.gbr_ul;
+
+  bstring msg_dup = bstrcpy(*msg);
+  *msg = NULL;
+  MSC_LOG_TX_MESSAGE (MSC_NAS_ESM_MME, MSC_NAS_EMM_MME, NULL, 0, "0 EMMESM_ACTIVATE_BEARER_REQ ue id " MME_UE_S1AP_ID_FMT " ebi %u", ue_id, ebi);
   rc = emm_sap_send (&emm_sap);
 
   if (rc != RETURNerror) {
     /*
      * Start T3485 retransmission timer
      */
-    rc = esm_ebr_start_timer (emm_context, ebi, *msg, mme_config.nas_config.t3485_sec, _default_eps_bearer_activate_t3485_handler);
+    rc = esm_ebr_start_timer (emm_context, ebi, msg_dup, mme_config.nas_config.t3485_sec, _default_eps_bearer_activate_t3485_handler);
+  }else{
+    bdestroy_wrapper(&msg_dup);
   }
-  *msg = NULL;
 
   OAILOG_FUNC_RETURN (LOG_NAS_ESM, rc);
 }

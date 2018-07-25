@@ -19,17 +19,13 @@
  *      contact@openairinterface.org
  */
 
-/*! \file s6a_messages.h
-  \brief
-  \author Sebastien ROUX
-  \company Eurecom
-*/
 
 #ifndef S6A_MESSAGES_H_
 #define S6A_MESSAGES_H_
 
 int s6a_generate_update_location(s6a_update_location_req_t *ulr_p);
 int s6a_generate_authentication_info_req(s6a_auth_info_req_t *uar_p);
+int s6a_generate_notify_req(s6a_notify_req_t *uar_p);
 
 int s6a_ula_cb(struct msg **msg, struct avp *paramavp,
                struct session *sess, void *opaque,
@@ -37,6 +33,18 @@ int s6a_ula_cb(struct msg **msg, struct avp *paramavp,
 int s6a_aia_cb(struct msg **msg, struct avp *paramavp,
                struct session *sess, void *opaque,
                enum disp_action *act);
+int s6a_clr_cb(struct msg **msg, struct avp *paramavp,
+               struct session *sess, void *opaque,
+               enum disp_action *act);
+int s6a_rr_cb(struct msg **msg, struct avp *paramavp,
+               struct session *sess, void *opaque,
+               enum disp_action *act);
+int s6a_na_cb(struct msg **msg, struct avp *paramavp,
+               struct session *sess, void *opaque,
+               enum disp_action *act);
+
+int s6a_add_result_code_mme(struct msg *ans, struct avp *failed_avp,
+                        int result_code, int experimental);
 
 int s6a_parse_subscription_data(struct avp *avp_subscription_data,
                                 subscription_data_t *subscription_data);

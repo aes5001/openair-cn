@@ -119,11 +119,11 @@ endif()
 add_list_string_option(CMAKE_BUILD_TYPE "RelWithDebInfo" "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." Debug Release RelWithDebInfo MinSizeRel)
 Message("Build type is ${CMAKE_BUILD_TYPE}")
 if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  add_boolean_option(LOG_OAI True         "Thread safe logging API")
-  add_boolean_option(LOG_OAI_MINIMAL True "Thread safe logging API, log only levels above NOTICE")
+  add_boolean_option(LOG_OAI True         "Thread safe logging api")
+  add_boolean_option(LOG_OAI_MINIMAL True "Thread safe logging api, log only levels above NOTICE")
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_boolean_option(LOG_OAI True "Thread safe logging API")
+  add_boolean_option(LOG_OAI True "Thread safe logging api")
 endif()
 
 ################################################################
@@ -209,31 +209,26 @@ include(CheckLibraryExists)
 include(CheckSymbolExists)
 include(CheckTypeSize)
 
-###############################################################################
-# Split repository for licensing reasons
-###############################################################################
-add_boolean_option( MOBILITY_REPO                   False    "Split repository for licensing reasons, values: False or path to local mounted folder ex /tmp/openair-cn-mobility")
-
 
 ###############################################################################
 # Debug and build related options
 ###############################################################################
 add_boolean_option( DAEMONIZE                       False    "Fork executable if true")
-add_boolean_option( DEBUG_MUTEX                     False    "Trace mutex lock/unlock")
-add_boolean_option( ASSERT_MUTEX                    False    "Raise segfault if can't lock mutex")
 
 add_boolean_option( DISABLE_ITTI_DETECT_SUB_TASK_ID False    " ")
 add_boolean_option( DISPLAY_LICENCE_INFO            False    "If a module has a licence banner to show")
 add_boolean_option( ENABLE_ITTI                     True     "ITTI is internal messaging, should remain enabled for most targets")
+add_boolean_option( ENABLE_ITTI_ANALYZER            False    "ITTI Analyzer is a GUI based on GTK that displays the ITTI messages exchanged between tasks")
 add_integer_option( ITTI_TASK_STACK_SIZE            0        "pthread allocated stack size in bytes of an ITTI task, if 0, use default stack size ") 
 add_boolean_option( ITTI_LITE                       False    "Do not use ITTI systematically for each message exchanged between layer modules") 
 add_boolean_option( MESSAGE_CHART_GENERATOR         False    "For generating sequence diagrams")
-add_boolean_option( DISABLE_EXECUTE_SHELL_COMMAND   False    "disable execution of C int system(const char *command);")
+add_boolean_option( ENABLE_LIBGTPNL                 False    "Use libgtpnl (patched for dealing with packets marked) for setting GTPV1U tunnels")
+add_boolean_option( ENABLE_OPENFLOW                 False    "Use OpenFlow for setting GTPV1U tunnels, use candidate version in dir src/openflow/controller")
+add_boolean_option( ENABLE_OPENFLOW_MOSAIC          False    "Use OpenFlow for setting GTPV1U tunnels, use candidate version in dir src/openflow/eps")
 # NAS LAYER OPTIONS
 ##########################
 add_boolean_option( EPC_BUILD                       False    "BUILD MME-xGW executable")
 add_boolean_option( GTPV1U_LINEAR_TEID_ALLOCATION   False    "Teid allocation id mode versus pseudo random")
-add_boolean_option( ENABLE_SDF_MARKING              False    "Should be set to true if you want to use patched GTP kernel module (old iptables/netfilter based design with marking)")
 # S1AP LAYER OPTIONS
 ##########################
 add_boolean_option(S1AP_DEBUG_LIST                  False    "Traces, option to be removed soon")
@@ -246,17 +241,9 @@ add_boolean_option( LOG_OAI                         False    "Thread safe loggin
 add_boolean_option( LOG_OAI_CLEAN_HARD              False    "Thread safe logging utility option for cleaning inner structs")
 add_boolean_option( SECU_DEBUG                      False    "Traces, option to be removed soon")
 
-
 add_boolean_option( TRACE_3GPP_SPEC                 True     "Log hits of 3GPP specifications requirements")
+add_boolean_option( TRACE_XML                       False     "Log some messages in XML (messages necessary for MME scenario player)")
 
-###############################################################################
-# Split repository for licensing reasons
-###############################################################################
-if(${MOBILITY_REPO})
-  message ("Extra mobility repo configured")
-else (${MOBILITY_REPO})
-  message ("No mobility extra repo configured")
-endif (${MOBILITY_REPO})
 
 set (ITTI_DIR ${OPENAIRCN_DIR}/src/common/itti)
 if (${ENABLE_ITTI})
@@ -270,6 +257,14 @@ if (${ENABLE_ITTI})
     ${ITTI_DIR}/signals.c
     ${ITTI_DIR}/timer.c
     )
+  if (${ENABLE_ITTI_ANALYZER})
+    set(ITTI_FILES
+    ${ITTI_FILES}
+    ${ITTI_DIR}/intertask_interface_dump.c 
+    ${OPENAIRCN_BIN_DIR}/messages_xml.h )
+    
+    include_directories ("${OPENAIRCN_BIN_DIR}")
+  endif (${ENABLE_ITTI_ANALYZER})
     
   add_library(ITTI ${ITTI_FILES})
     
@@ -282,8 +277,12 @@ add_library(3GPP_TYPES
   ${OPENAIRCN_DIR}/src/common/3gpp_24.008_mm_ies.c
   ${OPENAIRCN_DIR}/src/common/3gpp_24.008_gmm_ies.c
   ${OPENAIRCN_DIR}/src/common/3gpp_24.008_gprs_common_ies.c
-  ${OPENAIRCN_DIR}/src/common/3gpp_24.008_sm_ies.c)
+  ${OPENAIRCN_DIR}/src/common/3gpp_24.008_sm_ies.c
+  ${OPENAIRCN_DIR}/src/common/3gpp_29.274_sm_ies.c)
 set(3GPP_TYPES_LIB 3GPP_TYPES)
+
+
+
 
 ###############################################################################
 # ASN.1 grammar C code generation & dependancies
@@ -345,34 +344,18 @@ add_library(S1AP_LIB
 include_directories ("${S1AP_C_DIR}")
 include_directories ("${S1AP_DIR}")
 
-if(${MOBILITY_REPO})
-  include_directories ("${MOBILITY_REPO_SRC}/src/s1ap/")
-  add_library(S1AP_EPC
-    ${S1AP_C_DIR}/s1ap_ies_defs.h
-    ${MOBILITY_REPO_SRC}/src/s1ap/s1ap_mobility_handover_signaling_handler.c
-    ${S1AP_DIR}/s1ap_mme_encoder.c
-    ${S1AP_DIR}/s1ap_mme_decoder.c
-    ${S1AP_DIR}/s1ap_mme_handlers.c
-    ${S1AP_DIR}/s1ap_mme_nas_procedures.c
-    ${S1AP_DIR}/s1ap_mme.c
-    ${S1AP_DIR}/s1ap_mme_itti_messaging.c
-    ${S1AP_DIR}/s1ap_mme_retransmission.c
-    ${S1AP_DIR}/s1ap_mme_ta.c
-  ) 
-else (${MOBILITY_REPO})
-  add_library(S1AP_EPC
-    ${S1AP_C_DIR}/s1ap_ies_defs.h
-    ${S1AP_DIR}/s1ap_handover_signaling_handler.c
-    ${S1AP_DIR}/s1ap_mme_encoder.c
-    ${S1AP_DIR}/s1ap_mme_decoder.c
-    ${S1AP_DIR}/s1ap_mme_handlers.c
-    ${S1AP_DIR}/s1ap_mme_nas_procedures.c
-    ${S1AP_DIR}/s1ap_mme.c
-    ${S1AP_DIR}/s1ap_mme_itti_messaging.c
-    ${S1AP_DIR}/s1ap_mme_retransmission.c
-    ${S1AP_DIR}/s1ap_mme_ta.c
+
+add_library(S1AP_EPC
+  ${S1AP_C_DIR}/s1ap_ies_defs.h
+  ${S1AP_DIR}/s1ap_mme_encoder.c
+  ${S1AP_DIR}/s1ap_mme_decoder.c
+  ${S1AP_DIR}/s1ap_mme_handlers.c
+  ${S1AP_DIR}/s1ap_mme_nas_procedures.c
+  ${S1AP_DIR}/s1ap_mme.c
+  ${S1AP_DIR}/s1ap_mme_itti_messaging.c
+  ${S1AP_DIR}/s1ap_mme_retransmission.c
+  ${S1AP_DIR}/s1ap_mme_ta.c
   )
-endif ()
 
 
 
@@ -389,11 +372,10 @@ include_directories("${OPENAIRCN_BIN_DIR}")
 # the internal rule is to use generic names such as defs.h
 # but to make it uniq name as adding the relative path in the include directive
 # example: #include "RRC/LITE/defs.h"
-#find_path (include_dirs_all *.h ${OPENAIRCN_DIR}/SRC)
+#find_path (include_dirs_all *.h ${OPENAIRCN_DIR}/src)
 #find_path (include_dirs_all *.h PATHS /usr/include NO_CMAKE_PATH)
 #include_directories("${include_dirs_all}")
 ###############################################################################
-
 
 include_directories("${OPENAIRCN_DIR}/src/common")
 include_directories("${OPENAIRCN_DIR}/src/utils")
@@ -412,9 +394,9 @@ include_directories("${OPENAIRCN_DIR}/src/s1ap")
 include_directories("${OPENAIRCN_DIR}/src/udp")
 include_directories("${OPENAIRCN_DIR}/src/gtpv1-u")
 include_directories("${OPENAIRCN_DIR}/src/utils/hashtable")
-include_directories("${OPENAIRCN_DIR}/src/utils/lfds/liblfds6.1.1/liblfds611/inc")
 include_directories("${OPENAIRCN_DIR}/src/utils/msc")
 include_directories("${OPENAIRCN_DIR}/src/utils/bstr")
+include_directories("${OPENAIRCN_DIR}/src/mme")
 include_directories("${OPENAIRCN_DIR}/src/sgw")
 include_directories("${OPENAIRCN_DIR}/src/mme_app")
 include_directories("${OPENAIRCN_DIR}/src/s6a")
@@ -437,8 +419,6 @@ add_library(HASHTABLE
   ${OPENAIRCN_DIR}/src/utils/hashtable/hashtable_uint64.c
   ${OPENAIRCN_DIR}/src/utils/hashtable/obj_hashtable.c
   ${OPENAIRCN_DIR}/src/utils/hashtable/obj_hashtable_uint64.c
-  ${OPENAIRCN_DIR}/src/utils/hashtable/hashtable.c
-  ${OPENAIRCN_DIR}/src/utils/hashtable/obj_hashtable.c
 )
 include_directories(${OPENAIRCN_DIR}/src/utils/hashtable)
 
@@ -450,6 +430,65 @@ if (MESSAGE_CHART_GENERATOR)
 endif()
 include_directories(${OPENAIRCN_DIR}/src/utils/msc/msc)
 
+
+if (TRACE_XML)
+  add_library(XML_MSG_DUMP  
+    ${OPENAIRCN_DIR}/src/utils/xml_msg_dump.c
+    ${OPENAIRCN_DIR}/src/utils/xml_msg_dump_itti.c
+    ${OPENAIRCN_DIR}/src/nas/api/network/nas_message_xml.c
+  )
+  set(XML_MSG_DUMP_LIB XML_MSG_DUMP)
+  
+ add_library(3GPP_TYPES_XML
+    ${OPENAIRCN_DIR}/src/common/3gpp_23.003_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.007_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_cc_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_common_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_mm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_gmm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_gprs_common_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_24.008_sm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_29.274_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_common_ies_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_ies_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_emm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_esm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_emm_msg_xml.c
+    ${OPENAIRCN_DIR}/src/nas/3gpp_24.301_esm_msg_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_36.331_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_36.401_xml.c
+    ${OPENAIRCN_DIR}/src/common/3gpp_36.413_xml.c)
+  set(3GPP_TYPES_XML_LIB 3GPP_TYPES_XML)  
+
+  add_library(SCENARIO_PLAYER
+    ${OPENAIRCN_DIR}/src/secu/etsi_ts_135_206_V10.0.0_annex3.c
+    ${OPENAIRCN_DIR}/src/secu/usim_authenticate.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/mme_scenario_player_load.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/mme_scenario_player_play.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/mme_scenario_player_rx_itti.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/mme_scenario_player_task.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_23.003_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.007_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.008_common_ies_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.008_sm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.301_emm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.301_emm_msg_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.301_esm_ies_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.301_esm_msg_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_24.301_ies_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_36.401_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_3gpp_36.413_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_common_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_nas_message_xml.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_xml_compare.c
+    ${OPENAIRCN_DIR}/src/test/scenario_player/sp_xml_load.c
+    ${OPENAIRCN_DIR}/src/utils/xml_load.c
+    ${OPENAIRCN_DIR}/src/utils/xml_msg_load_itti.c
+  )
+  set(SCENARIO_PLAYER_LIB SCENARIO_PLAYER)
+endif (TRACE_XML)
+
+include_directories(${OPENAIRCN_DIR}/src/test/scenario_player/)
 
 ###############################################################################
 # Security library
@@ -475,7 +514,6 @@ add_library(SECU_CN ${SECU_CN_SRC})
 set(CN_UTILS_SRC
   ${OPENAIRCN_DIR}/src/utils/async_system.c
   ${OPENAIRCN_DIR}/src/utils/conversions.c
-  ${OPENAIRCN_DIR}/src/utils/digest.c
   ${OPENAIRCN_DIR}/src/utils/dynamic_memory_check.c
   ${OPENAIRCN_DIR}/src/utils/enum_string.c
   ${OPENAIRCN_DIR}/src/utils/mcc_mnc_itu.c
@@ -483,6 +521,7 @@ set(CN_UTILS_SRC
   ${OPENAIRCN_DIR}/src/utils/shared_ts_log.c
   ${OPENAIRCN_DIR}/src/utils/TLVEncoder.c
   ${OPENAIRCN_DIR}/src/utils/TLVDecoder.c
+  ${OPENAIRCN_DIR}/src/utils/xml2_wrapper.c
   )
 
 if (LOG_OAI)
@@ -498,11 +537,12 @@ set(GTPV1U_DIR ${OPENAIRCN_DIR}/src/gtpv1-u)
 set (GTPV1U_SRC
   ${GTPV1U_DIR}/gtpv1u_task.c
   ${GTPV1U_DIR}/gtpv1u_teid_pool.c
-  ${GTPV1U_DIR}/gtp_tunnel_libgtpnl.c
+  ${GTPV1U_DIR}/gtp_mod_kernel.c
 )
 add_library(GTPV1U ${GTPV1U_SRC})
 
 set(GTPV2C_DIR  ${OPENAIRCN_DIR}/src/gtpv2-c/nwgtpv2c-0.11/src)
+set(GTPV2C_FORMATTER_DIR  ${OPENAIRCN_DIR}/src/gtpv2-c/gtpv2c_ie_formatter/src)
 add_library(GTPV2C
   ${GTPV2C_DIR}/NwGtpv2cTrxn.c
   ${GTPV2C_DIR}/NwGtpv2cTunnel.c
@@ -510,10 +550,12 @@ add_library(GTPV2C
   ${GTPV2C_DIR}/NwGtpv2cMsgIeParseInfo.c
   ${GTPV2C_DIR}/NwGtpv2cMsgParser.c
   ${GTPV2C_DIR}/NwGtpv2c.c
+  ${GTPV2C_FORMATTER_DIR}/gtpv2c_ie_formatter.c
   )
+  
 include_directories(${OPENAIRCN_DIR}/src/gtpv2-c/nwgtpv2c-0.11/include/)
 include_directories(${OPENAIRCN_DIR}/src/gtpv2-c/nwgtpv2c-0.11/shared/)
-
+include_directories(${OPENAIRCN_DIR}/src/gtpv2-c/gtpv2c_ie_formatter/shared/)
 
 add_library(SCTP_SERVER
   ${OPENAIRCN_DIR}/src/sctp/sctp_common.c
@@ -542,15 +584,27 @@ add_library(S11_SGW
 )
 include_directories(${S11_DIR})
 
+set(S10_DIR ${OPENAIRCN_DIR}/src/s10)
+add_library(S10_MME
+  ${S10_DIR}/s10_common.c
+  ${S10_DIR}/s10_ie_formatter.c
+  ${S10_DIR}/s10_mme_task.c
+  ${S10_DIR}/s10_mme_session_manager.c
+)
+include_directories(${S10_DIR})
+
 set(S6A_DIR ${OPENAIRCN_DIR}/src/s6a)
 add_library(S6A
   ${S6A_DIR}/s6a_auth_info.c
   ${S6A_DIR}/s6a_dict.c
   ${S6A_DIR}/s6a_error.c
+  ${S6A_DIR}/s6a_common.c
   ${S6A_DIR}/s6a_peer.c
   ${S6A_DIR}/s6a_subscription_data.c
   ${S6A_DIR}/s6a_task.c
   ${S6A_DIR}/s6a_up_loc.c
+  ${S6A_DIR}/s6a_reset.c
+  ${S6A_DIR}/s6a_clear_loc.c
   )
 
 set(SGW_DIR ${OPENAIRCN_DIR}/src/sgw)
@@ -560,7 +614,6 @@ add_library (SGW
   ${SGW_DIR}/pgw_pcef_emulation.c
   ${SGW_DIR}/pgw_pco.c
   ${SGW_DIR}/pgw_procedures.c
-  ${SGW_DIR}/pgw_ue_ip_address_alloc.c
   ${SGW_DIR}/s11_causes.c
   ${SGW_DIR}/sgw_config.c
   ${SGW_DIR}/sgw_context_manager.c
@@ -584,11 +637,12 @@ add_library(MME_APP
   ${MME_DIR}/mme_app_main.c
   ${MME_DIR}/mme_app_pdn_context.c
   ${MME_DIR}/mme_app_procedures.c
-  ${MME_DIR}/mme_app_sgw_selection.c
+  ${MME_DIR}/mme_app_wrr_selection.c
   ${MME_DIR}/mme_app_statistics.c
   ${MME_DIR}/mme_app_transport.c
   ${MME_DIR}/mme_app_ue_context.c
   ${MME_DIR}/mme_config.c
+  ${MME_DIR}/s6a_2_nas_cause.c
   )
 
 
@@ -702,7 +756,7 @@ set(libnas_ies_OBJS
 )
 
 set (libnas_utils_OBJS
-  ${NAS_SRC}util/nas_timer.c
+  ${NAS_SRC}/util/nas_timer.c
 )
 
 
@@ -722,21 +776,8 @@ set(libnas_mme_emm_OBJS
   ${NAS_SRC}emm/SecurityModeControl.c
   ${NAS_SRC}emm/ServiceRequestHdl.c
   ${NAS_SRC}emm/TrackingAreaUpdate.c
+  ${NAS_SRC}emm/TrackingAreaUpdateMobility.c
 )
-  
-if(${MOBILITY_REPO})
-  include_directories ("${MOBILITY_REPO_SRC}/src/nas/emm")
-  set(libnas_mme_emm_OBJS
-    ${libnas_mme_emm_OBJS}
-    ${MOBILITY_REPO_SRC}/src/nas/emm/TrackingAreaUpdateMobility.c
-  ) 
-else (${MOBILITY_REPO})
-  set(libnas_mme_emm_OBJS
-    ${libnas_mme_emm_OBJS}
-    ${NAS_SRC}/emm/TrackingAreaUpdateMobility.c
-  ) 
-endif ()
-
   
 set(libnas_mme_emm_sap_OBJS
   ${NAS_SRC}emm/sap/emm_as.c
@@ -793,12 +834,12 @@ add_library(LIB_NAS_MME
   )
   
 include_directories(${NAS_SRC})
+include_directories(${NAS_SRC}/util)
 include_directories(${NAS_SRC}/api/mme)
 include_directories(${NAS_SRC}/emm)
 include_directories(${NAS_SRC}/emm/sap)
 include_directories(${NAS_SRC}/esm)
 include_directories(${NAS_SRC}/esm/sap)
-
 
 
 # System packages that are required
@@ -821,11 +862,16 @@ include_directories(${CONFIG_INCLUDE_DIRS})
 pkg_search_module(CRYPTO libcrypto REQUIRED)
 include_directories(${CRYPTO_INCLUDE_DIRS})
 
-
+pkg_search_module(NETTLE nettle)
+if(NOT ${NETTLE_FOUND})
+  message("PACKAGE nettle not found: some targets will fail")
+else()
+  include_directories(${NETTLE_INCLUDE_DIRS})
+endif()
 
 pkg_search_module(NETTLE nettle)
 if(NOT ${NETTLE_FOUND})
-  message( FATAL_ERROR "PACKAGE nettle not found: some targets will fail. Run SCRIPTS/build_mme -i or SCRIPTS/build_hss -i  again!")
+  message( FATAL_ERROR "PACKAGE nettle not found: some targets will fail. Run scripts/build_mme -i or scripts/build_hss -i  again!")
 else()
   include_directories(${NETTLE_INCLUDE_DIRS})
 endif()
@@ -838,7 +884,7 @@ message ("NETTLE_VERSION_MAJOR = ${NETTLE_VERSION_MAJOR}")
 message ("NETTLE_VERSION_MINOR = ${NETTLE_VERSION_MINOR}")
 
 if ("${NETTLE_VERSION_MAJOR}" STREQUAL "" OR "${NETTLE_VERSION_MINOR}" STREQUAL "")
-  message( FATAL_ERROR "The nettle version not detected properly. Try to run SCRIPTS/build_mme -i or SCRIPTS/build_hss -i again" )
+  message( FATAL_ERROR "The nettle version not detected properly. Try to run SCRIPTS/build_mme -i or scripts/build_hss -i again" )
 endif()
 
 add_definitions("-DNETTLE_VERSION_MAJOR=${NETTLE_VERSION_MAJOR}")
@@ -874,14 +920,20 @@ add_executable(mme
   ${OPENAIRCN_DIR}/src/oai_mme/oai_mme.c
   ${OPENAIRCN_DIR}/src/common/common_types.c
   ${OPENAIRCN_DIR}/src/common/itti_free_defined_msg.c
+  ${OPENAIRCN_DIR}/src/common/itti_comp.c
   ${OPENAIRCN_DIR}/src/nas/nas_mme_task.c
   )
-
+  
+if( ITTI_ANALYZER )
+  add_executable(mme ${OPENAIRCN_BIN_DIR}/messages_xml.h )
+endif( ITTI_ANALYZER )
 target_link_libraries (mme
   -Wl,--start-group
-   LIB_NAS_MME S1AP_LIB S1AP_EPC S11_MME GTPV2C SCTP_SERVER UDP_SERVER SECU_CN  S6A MME_APP ${MSC_LIB} ${ITTI_LIB}  ${3GPP_TYPES_LIB} CN_UTILS HASHTABLE BSTR
+    S1AP_LIB S1AP_EPC S11_MME S10_MME GTPV2C SCTP_SERVER UDP_SERVER SECU_CN 
+   S6A MME_APP LIB_NAS_MME ${MSC_LIB} ${ITTI_LIB} ${XML_MSG_DUMP_LIB} ${3GPP_TYPES_LIB} 
+   ${3GPP_TYPES_XML_LIB} CN_UTILS ${SCENARIO_PLAYER_LIB} HASHTABLE BSTR 
   -Wl,--end-group
-  pthread m sctp  rt crypt ${LFDS} ${CRYPTO_LIBRARIES} ${OPENSSL_LIBRARIES} ${NETTLE_LIBRARIES} ${CONFIG_LIBRARIES} gnutls fdproto fdcore
+  pthread m sctp  rt crypt ${LFDS} ${CRYPTO_LIBRARIES} ${OPENSSL_LIBRARIES} ${NETTLE_LIBRARIES} ${CONFIG_LIBRARIES} ${LIBXML2_LIBRARIES} gnutls fdproto fdcore
   )
 
 
@@ -892,11 +944,15 @@ add_executable(spgw
   ${OPENAIRCN_DIR}/src/common/common_types.c
   ${OPENAIRCN_DIR}/src/common/itti_free_defined_msg.c
   )
+if( ITTI_ANALYZER )
+  add_executable(spgw ${OPENAIRCN_BIN_DIR}/messages_xml.h )
+endif( ITTI_ANALYZER )
 target_link_libraries (spgw
   -Wl,--start-group
-  GTPV1U SGW S11_SGW GTPV2C UDP_SERVER ${MSC_LIB} ${ITTI_LIB} ${3GPP_TYPES_LIB} CN_UTILS HASHTABLE BSTR
+  GTPV1U SGW S11_SGW GTPV2C UDP_SERVER ${MSC_LIB} ${ITTI_LIB} ${XML_MSG_DUMP_LIB} ${3GPP_TYPES_LIB} 
+   ${3GPP_TYPES_XML_LIB} CN_UTILS HASHTABLE BSTR
   -Wl,--end-group
-  pthread m rt gtpnl ${LFDS} ${CONFIG_LIBRARIES}  
+  pthread m rt gtpnl ${LFDS} ${CONFIG_LIBRARIES}  ${LIBXML2_LIBRARIES}  
   )
 
 
@@ -919,7 +975,10 @@ enable_testing()
 
 add_subdirectory(${OPENAIRCN_DIR}/src/test/ ${CMAKE_CURRENT_BINARY_DIR}/tests/)
 
-add_test(NAME test_imsi_convert COMMAND test_mme_app_ue_context_imsi)
+add_test(NAME test_imsi_convert   COMMAND test_mme_app_ue_context_imsi)
+#add_test(NAME Test_aes128_cmac        COMMAND test_aes128_cmac)
+#add_test(NAME Test_aes128_ctr_decrypt COMMAND test_aes128_ctr_decrypt)
+#add_test(NAME Test_aes128_ctr_encrypt COMMAND test_aes128_ctr_encrypt)
 
 
 # TODO
@@ -944,5 +1003,8 @@ add_test(NAME test_imsi_convert COMMAND test_mme_app_ue_context_imsi)
 #    -Wl,--start-group SECU_CN UTIL -Wl,--end-group ${LFDS}  m rt crypt ${CRYPTO_LIBRARIES} ${OPENSSL_LIBRARIES} ${NETTLE_LIBRARIES} ${CONFIG_LIBRARIES} fdproto fdcore
 #    )
 #endforeach(myExe)
+
+
+
 
 

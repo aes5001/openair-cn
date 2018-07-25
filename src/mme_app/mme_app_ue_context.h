@@ -32,7 +32,6 @@
  *  @{
  */
 
-
 #ifndef FILE_MME_APP_UE_CONTEXT_SEEN
 #define FILE_MME_APP_UE_CONTEXT_SEEN
 #include <stdint.h>
@@ -45,20 +44,21 @@
 #include "obj_hashtable.h"
 #include "bstrlib.h"
 #include "common_types.h"
+#include "mme_app_messages_types.h"
 #include "s1ap_messages_types.h"
 #include "nas_messages_types.h"
 #include "s6a_messages_types.h"
+#include "s10_messages_types.h"
+#include "s11_messages_types.h"
 #include "security_types.h"
-#include "sgw_ie_defs.h"
 #include "emm_data.h"
 #include "esm_data.h"
-
-
 
 typedef enum {
   ECM_IDLE = 0,
   ECM_CONNECTED,
 } ecm_state_t;
+
 
 #define IMSI_DIGITS_MAX 15
 
@@ -66,6 +66,8 @@ typedef struct {
   uint32_t length;
   char data[IMSI_DIGITS_MAX + 1];
 } mme_app_imsi_t;
+
+typedef int ( *mme_app_ue_callback_t) (void*);
 
 // TODO: (amar) only used in testing
 #define IMSI_FORMAT "s"
@@ -83,14 +85,17 @@ void mme_app_imsi_to_string(char * const imsi_dst, mme_app_imsi_t const * const 
 uint64_t mme_app_imsi_to_u64 (mme_app_imsi_t imsi_src);
 void mme_app_ue_context_uint_to_imsi(uint64_t imsi_src, mme_app_imsi_t *imsi_dst);
 void mme_app_convert_imsi_to_imsi_mme (mme_app_imsi_t * imsi_dst, const imsi_t *imsi_src);
-mme_ue_s1ap_id_t mme_app_ctx_get_new_ue_id(void);
+// todo: mme_ue_s1ap_id_t mme_app_ctx_get_new_ue_id(void);
+
+
 /*
  * Timer identifier returned when in inactive state (timer is stopped or has
  * failed to be started)
  */
 #define MME_APP_TIMER_INACTIVE_ID   (-1)
-#define MME_APP_DELTA_T3412_REACHABILITY_TIMER 4 // in minutes 
-#define MME_APP_DELTA_REACHABILITY_IMPLICIT_DETACH_TIMER 0 // in minutes 
+#define MME_APP_DELTA_T3412_REACHABILITY_TIMER 4 // in minutes
+#define MME_APP_DELTA_REACHABILITY_IMPLICIT_DETACH_TIMER 0 // in minutes
+#define MME_APP_INITIAL_CONTEXT_SETUP_RSP_TIMER_VALUE 2 // In seconds
 
 #define BEARER_STATE_NULL        0
 #define BEARER_STATE_SGW_CREATED (1 << 0)
@@ -98,15 +103,20 @@ mme_ue_s1ap_id_t mme_app_ctx_get_new_ue_id(void);
 #define BEARER_STATE_ENB_CREATED (1 << 2)
 #define BEARER_STATE_ACTIVE      (1 << 3)
 #define BEARER_STATE_S1_RELEASED (1 << 4)
-// EURECOM LG TODO REMOVE OR CLEAN
+
 typedef uint8_t mme_app_bearer_state_t;
 
-#define MME_APP_INITIAL_CONTEXT_SETUP_RSP_TIMER_VALUE 2 // In seconds
 
+// todo: #define MME_APP_INITIAL_CONTEXT_SETUP_RSP_TIMER_VALUE 2 // In seconds
 /* Timer structure */
 struct mme_app_timer_t {
   long id;         /* The timer identifier                 */
   long sec;       /* The timer interval value in seconds  */
+};
+
+typedef struct fteid_set_s {
+  fteid_t *s1u_fteid;
+  fteid_t *s5_fteid;
 };
 
 /** @struct bearer_context_t
@@ -115,6 +125,7 @@ struct mme_app_timer_t {
 typedef struct bearer_context_s {
   // EPS Bearer ID: An EPS bearer identity uniquely identifies an EP S bearer for one UE accessing via E-UTRAN
   ebi_t                       ebi;
+  ebi_t                       linked_ebi;
 
   // TI Transaction Identifier
   proc_tid_t                  transaction_identifier;
@@ -141,7 +152,12 @@ typedef struct bearer_context_s {
 
   // extra 23.401 spec members
   pdn_cid_t                         pdn_cx_id;
-  mme_app_bearer_state_t            bearer_state;
+
+  /*
+   * Two bearer states, one mme_app_bearer_state (towards SAE-GW) and one towards eNodeB (if activated in RAN).
+   * todo: setting one, based on the other is possible?
+   */
+  mme_app_bearer_state_t            bearer_state;   /**< Need bearer state to establish them. */
   esm_ebr_context_t                 esm_ebr_context;
   fteid_t                           enb_fteid_s1u;
 
@@ -149,16 +165,23 @@ typedef struct bearer_context_s {
   priority_level_t            priority_level;
   pre_emption_vulnerability_t preemption_vulnerability;
   pre_emption_capability_t    preemption_capability;
+
+  /** Add an entry field to make it part of a list. */
+  LIST_ENTRY(bearer_context_s) entries;      /* List. */
+
+  LIST_ENTRY(bearer_context_s) temp_entries; /* List to establish or reject the bearer contexts. */
+
+  struct bearer_context_s*     next_bc;
+  RB_ENTRY (bearer_context_s)    bearerContextRbtNode;            /**< RB Tree Data Structure Node        */
+
 } bearer_context_t;
-
-
 
 /** @struct subscribed_apn_t
  *  @brief Parameters that should be kept for a subscribed apn by the UE.
  */
 // For each active PDN connection:
 typedef struct pdn_context_s {
-  context_identifier_t context_identifier; // key
+  context_identifier_t      context_identifier; // key
 
   //APN in Use: The APN currently used. This APN shall be composed of the APN Network
   //            Identifier and the default APN Operator Identifier, as specified in TS 23.003 [9],
@@ -169,18 +192,19 @@ typedef struct pdn_context_s {
   // APN Restriction: Denotes the restriction on the combination of types of APN for the APN associated
   //                  with this EPS bearer Context.
 
-  // APN Subscribed: The subscribed APN received from the HSS.
+  // APN Subscribed: The subscribed APN received from the HSS (APN-NI // ULA:APN Service Selection).
   bstring                     apn_subscribed;
 
   // PDN Type: IPv4, IPv6 or IPv4v6
-  pdn_type_t                  pdn_type;
+  pdn_type_t                  pdn_type; /**< Set by UE/ULR. */
 
   // IP Address(es): IPv4 address and/or IPv6 prefix
   //                 NOTE:
   //                 The MME might not have information on the allocated IPv4 address.
   //                 Alternatively, following mobility involving a pre-release 8 SGSN, this
   //                 IPv4 address might not be the one allocated to the UE.
-  paa_t              paa;                         // set by S11 CREATE_SESSION_RESPONSE
+  paa_t             *paa ;                         // set by S11 CREATE_SESSION_RESPONSE
+
 
 
 
@@ -234,7 +258,10 @@ typedef struct pdn_context_s {
   // Default bearer: Identifies the EPS Bearer Id of the default bearer within the given PDN connection.
   ebi_t                       default_ebi;
 
-  int                         bearer_contexts[BEARERS_PER_UE]; // contains bearer indexes in ue_mm_context_t.bearer_contexts[], or -1
+  /*
+   * List of bearer contexts of the PDN session.
+   */
+  RB_HEAD(SessionBearers, bearer_context_s) session_bearers;
 
   //apn_configuration_t         apn_configuration; // set by S6A UPDATE LOCATION ANSWER
   //bstring                     pgw_id;            // an ID for P-GW through which a user can access the Subscribed APN
@@ -247,41 +274,52 @@ typedef struct pdn_context_s {
   bool                        is_active;
   protocol_configuration_options_t *pco; // temp storage of information waiting for activation of required procedure
 
+  RB_ENTRY (pdn_context_s)    pdnCtxRbtNode;            /**< RB Tree Data Structure Node        */
+
 } pdn_context_t;
 
 
-/** @struct ue_mm_context_t
+
+/** @struct ue_context_t
  *  @brief Useful parameters to know in MME application layer. They are set
  * according to 3GPP TS.23.401 #5.7.2
  */
-typedef struct ue_mm_context_s {
-  pthread_mutex_t recmutex;  // mutex on the ue_mm_context_t + emm_context_s + esm_context_t
+typedef struct ue_context_s {
+
+
+//  bool came_from_tau; /**< For test. */
+
+  // todo: ue context mutex
+  pthread_mutex_t recmutex;  // mutex on the ue_context_t + emm_context_s + esm_context_t
 
   /* Basic identifier for ue. IMSI is encoded on maximum of 15 digits of 4 bits,
    * so usage of an unsigned integer on 64 bits is necessary.
    */
-#define IMSI_UNAUTHENTICATED  (0x0)
-#define IMSI_AUTHENTICATED    (0x1)
-  /* Indicator to show the IMSI authentication state */
-  unsigned               imsi_auth:1;                 // set by nas_auth_resp_t
+  imsi64_t         imsi;                        // set by nas_auth_param_req_t
+#define IMSI_UNAUTHENTICATED  (false)
+#define IMSI_AUTHENTICATED    (true)
+  bool                   imsi_auth;           // This is an IMSI indicator to show the IMSI is unauthenticated. set by nas_auth_resp_t
 
   bstring                msisdn;                    // The basic MSISDN of the UE. The presence is dictated by its storage in the HSS.
                                                     // set by S6A UPDATE LOCATION ANSWER
 
-  enum s1cause           ue_context_rel_cause;
+  ecm_state_t             ecm_state;                // ECM state ECM-IDLE, ECM-CONNECTED.
+                                                    // not set/read
+
+//  S1ap_Cause_t            s1_ue_context_release_cause;
+  // todo: enum s1cause
+  enum s1cause            s1_ue_context_release_cause;
 
   // Globally Unique Temporary Identity can be found in emm_nas_context
   //bool                   is_guti_set;                 // is GUTI has been set
   //guti_t                 guti;                        // Globally Unique Temporary Identity. guti.gummei.plmn set by nas_auth_param_req_t
 
   mm_state_t             mm_state;
-  ecm_state_t            ecm_state;
 
   // read by S6A UPDATE LOCATION REQUEST
   // was me_identity_t // Mobile Equipment Identity – (e.g. IMEI/IMEISV) Software Version Number not set/read except read by display utility
   //imei_t                   _imei;        /* The IMEI provided by the UE     can be found in emm_nas_context                */
   //imeisv_t                 _imeisv;      /* The IMEISV provided by the UE   can be found in emm_nas_context                */
-
 
   tai_list_t             tail_list; // Current Tracking area list
 
@@ -292,6 +330,8 @@ typedef struct ue_mm_context_s {
   // read for S11 CREATE_SESSION_REQUEST
   /* Time when the cell identity was acquired */
   time_t                 cell_age;                    // Time elapsed since the last E-UTRAN Cell Global Identity was acquired. set by nas_auth_param_req_t
+
+  teid_t                 s_gw_teid_s11_s4;
 
   /* TODO: add csg_id */
   /* TODO: add csg_membership */
@@ -304,9 +344,10 @@ typedef struct ue_mm_context_s {
   // c) Key K ASME ,
   // d) a network authentication token AUTN.
 
-  network_access_mode_t  access_mode;                  // set by S6A UPDATE LOCATION ANSWER
+  /* Store the radio capabilities as received in S1AP UE capability indication message. */
+  // UE Radio Access Capability UE radio access capabilities.
+//  bstring                 ue_radio_capabilities;       // not set/read
 
-  /* TODO: add ue radio cap, ms classmarks, supported codecs */
 
   // UE Network Capability  // UE network capabilities including security algorithms and key derivation functions supported by the UE
 
@@ -318,10 +359,6 @@ typedef struct ue_mm_context_s {
   // Selected NAS Algorithm       // Selected NAS security algorithm
   // eKSI                         // Key Set Identifier for the main key K ASME . Also indicates whether the UE is using
                                   // security keys derived from UTRAN or E-UTRAN security association.
-
-  apn_config_profile_t   apn_profile;                  // set by S6A UPDATE LOCATION ANSWER
-  subscriber_status_t    sub_status;                   // set by S6A UPDATE LOCATION ANSWER
-  ambr_t                 subscribed_ambr;              // set by S6A UPDATE LOCATION ANSWER
 
   // K ASME                       // Main key for E-UTRAN key hierarchy based on CK, IK and Serving network identity
 
@@ -346,7 +383,6 @@ typedef struct ue_mm_context_s {
 
   // MME TEID for S11             // MME Tunnel Endpoint Identifier for S11 interface.
   // LOCATED IN THIS.subscribed_apns[MAX_APN_PER_UE].mme_teid_s11
-  teid_t                      mme_teid_s11;                // set by mme_app_send_s11_create_session_req
 
   // S-GW IP address for S11/S4   // S-GW IP address for the S11 and S4 interfaces
   // LOCATED IN THIS.subscribed_apns[MAX_APN_PER_UE].s_gw_address_s11_s4
@@ -369,9 +405,13 @@ typedef struct ue_mm_context_s {
   // MME UE S1AP ID, Unique identity of the UE within MME.
   mme_ue_s1ap_id_t       mme_ue_s1ap_id;
 
+  // MME TEID for S11             // MME Tunnel Endpoint Identifier for S11 interface.
+  // LOCATED IN THIS.subscribed_apns[MAX_APN_PER_UE].mme_teid_s11
+  teid_t                      local_mme_teid_s10;                // needed to get the UE context from S10 messages
+  teid_t                      mme_teid_s11;                // set by mme_app_send_s11_create_session_req
 
   // Subscribed UE-AMBR: The Maximum Aggregated uplink and downlink MBR values to be shared across all Non-GBR bearers according to the subscription of the user.
-  ambr_t                 suscribed_ue_ambr;
+  ambr_t                 subscribed_ue_ambr;
   // UE-AMBR: The currently used Maximum Aggregated uplink and downlink MBR values to be shared across all Non-GBR bearers.
   ambr_t                 used_ue_ambr;
   // EPS Subscribed Charging Characteristics: The charging characteristics for the MS e.g. normal, prepaid, flat rate and/or hot billing.
@@ -395,42 +435,79 @@ typedef struct ue_mm_context_s {
 
   // MPS EPS priority: Indicates that the UE is subscribed to MPS in the EPS domain.
 
-  // For each active PDN connection:
-  pdn_context_t         *pdn_contexts[MAX_APN_PER_UE]; // index is of type pdn_cid_t
-  int                    nb_active_pdn_contexts;
+  network_access_mode_t  access_mode;                  // set by S6A UPDATE LOCATION ANSWER
 
+  /*
+   * List of empty bearer context.
+   * Take the bearer contexts from here and put them into the PDN context.
+   */
+  // todo: check if they are necessary!
+  #define MAX_NUM_BEARERS_UE    11 /**< Maximum number of bearers. */
+  RB_HEAD(BearerPool, bearer_context_s) bearer_pool;
 
-
-
-  // Not in spec members
-  emm_context_t          emm_context;
-  bearer_context_t      *bearer_contexts[BEARERS_PER_UE];
+  /*
+   * List of empty bearer context.
+   * Take the bearer contexts from here and put them into the PDN context.
+   */
+  // todo: check if they are necessary!
+  #define MAX_APN_PER_UE    5 /**< Maximum number of PDN sesssions per UE. */
+  RB_HEAD(PdnContexts, pdn_context_s) pdn_contexts;
 
   apn_config_profile_t   apn_config_profile;                  // set by S6A UPDATE LOCATION ANSWER
-  /* Store the radio capabilities as received in S1AP UE capability indication
-   * message.
-   */
-  bstring                 ue_radio_capability;
-
-
-
-  
-  // Mobile Reachability Timer-Start when UE moves to idle state. Stop when UE moves to connected state
-  struct mme_app_timer_t       mobile_reachability_timer; 
-  // Implicit Detach Timer-Start at the expiry of Mobile Reachability timer. Stop when UE moves to connected state
-  struct mme_app_timer_t       implicit_detach_timer; 
-  // Initial Context Setup Procedure Guard timer 
-  struct mme_app_timer_t       initial_context_setup_rsp_timer; 
 
 #define SUBSCRIPTION_UNKNOWN    false
 #define SUBSCRIPTION_KNOWN      true
+
+
+  // Subscribed UE-AMBR: The Maximum Aggregated uplink and downlink MBR values to be shared across all Non-GBR bearers according to the subscription of the user.
+
+  apn_config_profile_t   apn_profile;                  // set by S6A UPDATE LOCATION ANSWER
+  subscriber_status_t    sub_status;                   // set by S6A UPDATE LOCATION ANSWER
+
+
   bool                   subscription_known;        // set by S6A UPDATE LOCATION ANSWER
   ambr_t                 used_ambr;
   subscriber_status_t    subscriber_status;        // set by S6A UPDATE LOCATION ANSWER
   network_access_mode_t  network_access_mode;       // set by S6A UPDATE LOCATION ANSWER
-  LIST_HEAD(s11_procedures_s, mme_app_s11_proc_s) *s11_procedures;
-} ue_mm_context_t;
 
+  /* S10 and S11 procedures. */
+  LIST_HEAD(s10_procedures_s, mme_app_s10_proc_s) *s10_procedures;
+  LIST_HEAD(s11_procedures_s, mme_app_s11_proc_s) *s11_procedures;
+
+  /* Time when the cell identity was acquired */
+
+  bstring                 ue_radio_capability;
+
+  /* Globally Unique Temporary Identity */
+  bool                   is_guti_set;                 // is guti has been set
+  guti_t                 guti;                        // guti.gummei.plmn set by nas_auth_param_req_t
+  // read by S6A UPDATE LOCATION REQUEST
+  me_identity_t          me_identity;                 // not set/read except read by display utility
+
+  /* TODO: Add TAI list */
+
+  /** Additional stuff for handover (pending flags etc..). */
+//  bool                   pending_bearer_deactivation; todo: when removing the tau procedure, evaluate and check (need to store old ECM state)?
+  bool                   pending_x2_handover; /**< Temporary flag, clear with Lionel how to integrate the X2 of B-COM. */
+  bool                   pending_bearer_deactivation; //todo: could not find a way to remove this yet.
+
+
+  // Mobile Reachability Timer-Start when UE moves to idle state. Stop when UE moves to connected state
+  struct mme_app_timer_t       mobile_reachability_timer;
+  // Implicit Detach Timer-Start at the expiry of Mobile Reachability timer. Stop when UE moves to connected state
+  struct mme_app_timer_t       implicit_detach_timer;
+  // Initial Context Setup Procedure Guard timer
+  struct mme_app_timer_t       initial_context_setup_rsp_timer;
+  /** Custom timer to remove UE at the source-MME side after a timeout. */
+//  struct mme_app_timer_t       mme_mobility_completion_timer; // todo: not TXXXX value found for this.
+
+  // Handover related stuff (for which messages to use the following
+  struct mme_app_timer_t       path_switch_req_timer;
+  // todo: (2) timers necessary for handover?
+  struct mme_app_timer_t       s1ap_handover_req_timer;
+
+  ebi_t                        next_def_ebi_offset;
+} ue_context_t;
 
 
 typedef struct mme_ue_context_s {
@@ -443,9 +520,10 @@ typedef struct mme_ue_context_s {
   uint32_t               nb_bearers_since_last_stat;
 
   hash_table_uint64_ts_t  *imsi_ue_context_htbl; // data is mme_ue_s1ap_id_t
+  hash_table_uint64_ts_t  *tun10_ue_context_htbl;// data is mme_ue_s1ap_id_t
   hash_table_uint64_ts_t  *tun11_ue_context_htbl;// data is mme_ue_s1ap_id_t
-  hash_table_ts_t         *mme_ue_s1ap_id_ue_context_htbl;
-  hash_table_uint64_ts_t  *enb_ue_s1ap_id_ue_context_htbl;
+  hash_table_uint64_ts_t  *mme_ue_s1ap_id_ue_context_htbl; // data is enb_s1ap_id_key_t
+  hash_table_ts_t         *enb_ue_s1ap_id_ue_context_htbl;
   obj_hash_table_uint64_t *guti_ue_context_htbl;// data is mme_ue_s1ap_id_t
 } mme_ue_context_t;
 
@@ -454,28 +532,36 @@ typedef struct mme_ue_context_s {
  * \param imsi Imsi to find in UE map
  * @returns an UE context matching the IMSI or NULL if the context doesn't exists
  **/
-ue_mm_context_t *mme_ue_context_exists_imsi(mme_ue_context_t * const mme_ue_context,
+ue_context_t *mme_ue_context_exists_imsi(mme_ue_context_t * const mme_ue_context,
     const imsi64_t imsi);
 
 /** \brief Retrieve an UE context by selecting the provided S11 teid
  * \param teid The tunnel endpoint identifier used between MME and S-GW
  * @returns an UE context matching the teid or NULL if the context doesn't exists
  **/
-ue_mm_context_t *mme_ue_context_exists_s11_teid(mme_ue_context_t * const mme_ue_context,
+ue_context_t *mme_ue_context_exists_s11_teid(mme_ue_context_t * const mme_ue_context,
     const s11_teid_t teid);
+
+/** \brief Retrieve an UE context by selecting the provided S10 teid
+ * \param teid The tunnel endpoint identifier used between MME and S-GW
+ * @returns an UE context matching the teid or NULL if the context doesn't exists
+ **/
+ue_context_t *mme_ue_context_exists_s10_teid(mme_ue_context_t * const mme_ue_context,
+    const s11_teid_t teid);
+
 
 /** \brief Retrieve an UE context by selecting the provided mme_ue_s1ap_id
  * \param mme_ue_s1ap_id The UE id identifier used in S1AP MME (and NAS)
  * @returns an UE context matching the mme_ue_s1ap_id or NULL if the context doesn't exists
  **/
-ue_mm_context_t *mme_ue_context_exists_mme_ue_s1ap_id(mme_ue_context_t * const mme_ue_context,
+ue_context_t *mme_ue_context_exists_mme_ue_s1ap_id(mme_ue_context_t * const mme_ue_context,
     const mme_ue_s1ap_id_t mme_ue_s1ap_id);
 
 /** \brief Retrieve an UE context by selecting the provided enb_ue_s1ap_id
  * \param enb_ue_s1ap_id The UE id identifier used in S1AP MME
  * @returns an UE context matching the enb_ue_s1ap_id or NULL if the context doesn't exists
  **/
-ue_mm_context_t *mme_ue_context_exists_enb_ue_s1ap_id (
+ue_context_t *mme_ue_context_exists_enb_ue_s1ap_id (
   mme_ue_context_t * const mme_ue_context_p,
   const enb_s1ap_id_key_t enb_key);
 
@@ -483,25 +569,8 @@ ue_mm_context_t *mme_ue_context_exists_enb_ue_s1ap_id (
  * \param guti The GUTI used by the UE
  * @returns an UE context matching the guti or NULL if the context doesn't exists
  **/
-ue_mm_context_t *mme_ue_context_exists_guti(mme_ue_context_t * const mme_ue_context,
+ue_context_t *mme_ue_context_exists_guti(mme_ue_context_t * const mme_ue_context,
     const guti_t * const guti);
-
-/** \brief Move the content of a context to another context
- * \param dst            The destination context
- * \param src            The source context
- **/
-void mme_app_move_context (ue_mm_context_t *dst, ue_mm_context_t *src);
-
-/** \brief Notify the MME_APP that a duplicated ue_context_t exist (both share the same mme_ue_s1ap_id)
- * \param enb_key        The UE id identifier used in S1AP and MME_APP (agregated with a enb_id)
- * \param mme_ue_s1ap_id The UE id identifier used in MME_APP and NAS
- * \param is_remove_old  Remove old UE context or new UE context ?
- **/
-void
-mme_ue_context_duplicate_enb_ue_s1ap_id_detected (
-  const enb_s1ap_id_key_t enb_key,
-  const mme_ue_s1ap_id_t  mme_ue_s1ap_id,
-  const bool              is_remove_old);
 
 /** \brief Create the association between mme_ue_s1ap_id and an UE context (enb_ue_s1ap_id key)
  * \param enb_key        The UE id identifier used in S1AP and MME_APP (agregated with a enb_id)
@@ -525,11 +594,12 @@ mme_ue_context_notified_new_ue_s1ap_id_association (
  **/
 void mme_ue_context_update_coll_keys(
     mme_ue_context_t * const mme_ue_context_p,
-    ue_mm_context_t     * const ue_context_p,
+    ue_context_t     * const ue_context_p,
     const enb_s1ap_id_key_t  enb_s1ap_id_key,
     const mme_ue_s1ap_id_t   mme_ue_s1ap_id,
     const imsi64_t     imsi,
-    const s11_teid_t         mme_s11_teid,
+    const s11_teid_t         mme_teid_s11,
+    const s10_teid_t         local_mme_teid_s10,
     const guti_t     * const guti_p);
 
 /** \brief dump MME associative collections
@@ -543,55 +613,50 @@ void mme_ue_context_dump_coll_keys(void);
  * @returns 0 in case of success, -1 otherwise
  **/
 int mme_insert_ue_context(mme_ue_context_t * const mme_ue_context,
-                         const struct ue_mm_context_s * const ue_context_p);
+                         const struct ue_context_s * const ue_context_p);
 
-
-/** \brief TODO WORK HERE Remove UE context unnecessary information.
- *  mark it as released. It is necessary to keep track of the association (s_tmsi (guti), mme_ue_s1ap_id)
- * \param ue_context_p The UE context to remove
- **/
-void mme_notify_ue_context_released (
-    mme_ue_context_t * const mme_ue_context_p,
-    struct ue_mm_context_s *ue_context_p);
 
 /** \brief Remove a UE context of the tree of known UEs.
  * \param ue_context_p The UE context to remove
  **/
 void mme_remove_ue_context(mme_ue_context_t * const mme_ue_context,
-		                   struct ue_mm_context_s * const ue_context_p);
+		                   struct ue_context_s * const ue_context_p);
 
-
-int lock_ue_contexts(ue_mm_context_t * const ue_context_p);
-
-int unlock_ue_contexts(ue_mm_context_t * const ue_context_p);
 
 /** \brief Allocate memory for a new UE context
  * @returns Pointer to the new structure, NULL if allocation failed
  **/
-ue_mm_context_t *mme_create_new_ue_context(void);
+ue_context_t *mme_create_new_ue_context(void);
 
 void mme_app_free_pdn_connection (pdn_context_t ** const pdn_connection);
 
-void mme_app_ue_context_free_content (ue_mm_context_t * const mme_ue_context_p);
+void mme_app_ue_context_free_content (ue_context_t * const mme_ue_context_p);
+
 
 /** \brief Dump the UE contexts present in the tree
  **/
 void mme_app_dump_ue_contexts(const mme_ue_context_t * const mme_ue_context);
 
+int mme_app_registration_complete(const mme_ue_s1ap_id_t mme_ue_s1ap_id);
 
 void mme_app_handle_s1ap_ue_context_release_req(const itti_s1ap_ue_context_release_req_t const *s1ap_ue_context_release_req);
 
-bearer_context_t* mme_app_get_bearer_context(ue_mm_context_t  * const ue_context, const ebi_t ebi);
+//bearer_context_t* mme_app_get_bearer_context(ue_context_t  * const ue_context, const ebi_t ebi);
 
-void mme_app_handle_enb_deregister_ind(const itti_s1ap_eNB_deregistered_ind_t const* eNB_deregistered_ind);
+bearer_context_t* mme_app_get_bearer_context_by_state(ue_context_t * const ue_context, const pdn_cid_t cid, const mme_app_bearer_state_t state);
 
-bearer_context_t* mme_app_get_bearer_context_by_state(ue_mm_context_t * const ue_context, const pdn_cid_t cid, const mme_app_bearer_state_t state);
-
-ebi_t mme_app_get_free_bearer_id(ue_mm_context_t * const ue_context);
+ebi_t mme_app_get_free_bearer_id(ue_context_t * const ue_context);
 
 void mme_app_free_bearer_context(bearer_context_t ** bc);
 
-void mme_app_send_delete_session_request (struct ue_mm_context_s * const ue_context_p, const ebi_t ebi, const pdn_cid_t cid);
+void mme_app_ue_context_s1_release_enb_informations(ue_context_t *ue_context);
+
+/* Declaration (prototype) of the function to store pdn and bearer contexts. */
+RB_PROTOTYPE(PdnContexts, pdn_context_s, pdn_ctx_rbt_Node, mme_app_compare_pdn_context)
+
+RB_PROTOTYPE(BearerPool, bearer_context_s, bearer_ctx_rbt_Node, mme_app_compare_bearer_context)
+
+RB_PROTOTYPE(SessionBearers, bearer_context_s, bearer_ctx_rbt_Node, mme_app_compare_bearer_context)
 
 #endif /* FILE_MME_APP_UE_CONTEXT_SEEN */
 

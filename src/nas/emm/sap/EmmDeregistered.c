@@ -102,7 +102,7 @@ int EmmDeregistered (emm_reg_t * const evt)
 {
   OAILOG_FUNC_IN (LOG_NAS_EMM);
   int                                     rc = RETURNerror;
-  emm_context_t                          *emm_ctx = evt->ctx;
+  emm_data_context_t                          *emm_ctx = evt->ctx;
 
   assert (emm_fsm_get_state (emm_ctx) == EMM_DEREGISTERED);
 
@@ -138,14 +138,22 @@ int EmmDeregistered (emm_reg_t * const evt)
      * context activated;
      * enter state EMM-REGISTERED.
      */
+    rc = emm_fsm_set_state (evt->ue_id, evt->ctx, EMM_REGISTERED);
+    assert(rc == RETURNok);
+
+    /*
+     * Call this method after setting the state.
+     * Initial Context Setup Response might have been received meanwhile.
+     * todo: add locks
+     */
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_CNF ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    if ((emm_ctx) && (evt->notify) && (evt->u.attach.proc) && (evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)) {
+    if ((emm_ctx) /*&& (evt->notify) */&& (evt->u.attach.proc) && (evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)) {
       rc = (*evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.success_notif)(emm_ctx);
     }
-    if (evt->free_proc) {
-      nas_delete_attach_procedure(emm_ctx);
-    }
-    rc = emm_fsm_set_state (evt->ue_id, evt->ctx, EMM_REGISTERED);
+    //    if (evt->free_proc) {
+        nas_delete_attach_procedure(emm_ctx);
+  //    }
+
     break;
 
   case _EMMREG_ATTACH_REJ:
@@ -169,22 +177,8 @@ int EmmDeregistered (emm_reg_t * const evt)
     break;
 
   case _EMMREG_ATTACH_ABORT:
-    MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
-    // TODO when abort is called it may trigger a emm_proc_detach_request() that will free the emm_spec_proc
-    failure_cb_t failure_notif = NULL;
-    if ((emm_ctx) && (evt->u.attach.proc)) {
-      failure_notif = evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.failure_notif;
-      if (evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.abort) {
-        rc = (*evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc.abort)(emm_ctx, &evt->u.attach.proc->emm_spec_proc.emm_proc.base_proc);
-      }
-    }
-
-    if ((emm_ctx) && (evt->notify) && (evt->u.attach.proc) && (failure_notif)) {
-      rc = (*failure_notif)(emm_ctx);
-    }
-    if (evt->free_proc) {
-      nas_delete_attach_procedure(emm_ctx);
-    }
+    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED - Primitive _EMMREG_ATTACH_ABORT is not valid\n");
+    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_ATTACH_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
     break;
 
   case _EMMREG_DETACH_INIT:
@@ -218,9 +212,47 @@ int EmmDeregistered (emm_reg_t * const evt)
     break;
 
   case _EMMREG_TAU_REJ:
-    OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED - Primitive _EMMREG_TAU_REJ is not valid\n");
-    MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_TAU_REJ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+    MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_TAU_REJ ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+
+    if ((emm_ctx) && (evt->u.tau.proc) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.fail_out)) {
+      rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.fail_out)(emm_ctx, &evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc);
+    }
+
+    if ((emm_ctx) && (evt->notify) && (evt->u.tau.proc) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)) {
+      rc = (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)(emm_ctx);
+    }
+    if (evt->free_proc) {
+      nas_delete_tau_procedure(emm_ctx);
+    }
     break;
+
+  case _EMMREG_TAU_ABORT:
+     if (evt->u.tau.proc) {
+       MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_TAU_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+       rc = emm_fsm_set_state (evt->ue_id, emm_ctx, EMM_DEREGISTERED);
+
+       /*
+        * Stop timer T3450 (if exists).
+        */
+       void * timer_callback_args = NULL;
+       nas_stop_T3450(evt->u.tau.proc->ue_id, &evt->u.tau.proc->T3450, timer_callback_args);
+
+       if ((emm_ctx) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.abort)) { /**< Currently, will perform IMPLICIT detach. */
+         (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.abort)((nas_base_proc_t*) emm_ctx, evt->u.tau.proc); // &evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc);
+       }
+ //
+ //      if ((rc != RETURNerror) && (emm_ctx) && (evt->notify) && (evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)) {
+ //        (*evt->u.tau.proc->emm_spec_proc.emm_proc.base_proc.failure_notif)(emm_ctx);
+ //      }
+ //
+ //      // todo: T3450 actually should be stopped here, since T3450 is activated for TAU only if GUTI is not sent & COMMON procedure will not be entered.
+ //      if (evt->free_proc) {
+ //        nas_delete_tau_procedure(emm_ctx);
+ //      }
+     } else {
+       MSC_LOG_RX_DISCARDED_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_TAU_ABORT ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
+     }
+     break;
 
   case _EMMREG_SERVICE_REQ:
     OAILOG_ERROR (LOG_NAS_EMM, "EMM-FSM state EMM_DEREGISTERED - Primitive _EMMREG_SERVICE_REQ is not valid\n");
@@ -272,6 +304,7 @@ int EmmDeregistered (emm_reg_t * const evt)
     MSC_LOG_RX_MESSAGE (MSC_NAS_EMM_MME, MSC_NAS_EMM_MME, NULL, 0, "_EMMREG_LOWERLAYER_RELEASE ue id " MME_UE_S1AP_ID_FMT " ", evt->ue_id);
 
     nas_delete_all_emm_procedures(emm_ctx);
+    nas_delete_all_esm_procedures(emm_ctx);
     rc = RETURNok;
     break;
 
